@@ -1,6 +1,7 @@
 """Getting video in: link download, probing, audio extraction, loudness."""
 import contextlib
 import json
+import os
 import re
 import subprocess
 import time
@@ -101,12 +102,22 @@ def cookie_opts() -> dict:
     return {"cookiefile": str(config.YT_COOKIES)} if config.YT_COOKIES.is_file() else {}
 
 
+def js_runtimes_opts() -> dict:
+    """Enable JavaScript runtimes (Node, Deno, Bun, QuickJS) for yt-dlp to solve YouTube player deciphering challenges."""
+    runtimes = {"node": {}, "deno": {}, "bun": {}, "quickjs": {}}
+    if os.name == "nt":
+        node_std = Path(r"C:\Program Files\nodejs\node.exe")
+        if node_std.is_file() and "node" not in os.environ.get("PATH", "").lower():
+            runtimes["node"] = {"path": str(node_std)}
+    return {"js_runtimes": runtimes}
+
+
 def _ydl(opts):
     import yt_dlp
     # a channel or playlist link is answered as "a list" straight away, never walked video by video
     return yt_dlp.YoutubeDL({"noplaylist": True, "quiet": True, "no_warnings": True, "logger": _Quiet(),
                              "extract_flat": "in_playlist", "playlistend": 1, "socket_timeout": 20,
-                             "concurrent_fragment_downloads": 4, **cookie_opts(), **opts})
+                             "concurrent_fragment_downloads": 4, **cookie_opts(), **js_runtimes_opts(), **opts})
 
 
 def _video_format(height):
