@@ -112,7 +112,7 @@ def mine(jid):
 class Session:
     def __init__(self, job, settings):
         self.job, self.settings = job, settings
-        self.dir = Path(job["dir"])
+        self.dir = Path(job["dir"]).resolve()
         self.buf = self.dir / "buffer"
         self.buf.mkdir(exist_ok=True)
         (self.dir / "clips").mkdir(exist_ok=True)
@@ -678,8 +678,8 @@ class Session:
             meta = media.probe(segs[0][0])
             self.job.update(width=meta["width"], height=meta["height"])
         lst = self.dir / "clips" / f"{clip['id']}.txt"
-        lst.write_text("".join(f"file '{s[0].as_posix()}'\n" for s in segs), encoding="utf-8")
-        src = self.dir / "clips" / f"{clip['id']}.src.ts"
+        lst.write_text("".join(f"file '{Path(s[0]).resolve().as_posix()}'\n" for s in segs), encoding="utf-8")
+        src = (self.dir / "clips" / f"{clip['id']}.src.ts").resolve()
         try:
             media.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lst),
                        "-c", "copy", str(src)])

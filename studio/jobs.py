@@ -604,9 +604,16 @@ def render_one(job, clip, words):
     save(job)
     try:
         if not clip.get("src") and not job.get("source_path"):
+            if job.get("kind") == "live":
+                raise RuntimeError("The recorded stream piece for this live clip is not in the buffer or was interrupted.")
             _piece_again(job, clip)
         off = clip.get("src_offset", 0.0)
         src = Path(clip["src"]) if clip.get("src") else Path(job["source_path"])
+        if not src.is_file():
+            for cand in [d / src.name, d / "clips" / src.name, config.ROOT / src]:
+                if cand.is_file():
+                    src = cand
+                    break
         if not clip.get("src"):
             clip["end"] = min(clip["end"], job["duration"])
         hook_text = clip.get("hook") if clip.get("hook") is not None else clip.get("title", "")
