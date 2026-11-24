@@ -110,6 +110,35 @@ try:
     check("without a webcam the game simply fills the screen",
           "scale=1080:1920" in render._filter("gameplay", 1920, None) and "overlay=" not in render._filter("gameplay", 1920, None), True)
     check("the layout is offered to the user", "gameplay" in render.LAYOUTS, True)
+    # ---- stacked gaming layout: facecam on top (720px), gameplay below (1200px), 0 gap
+    check("stacked layout is offered to the user", "stacked" in render.LAYOUTS, True)
+    f_st = render._filter("stacked", 1920, [0, 0, 300, 170])
+    check("stacked filter uses 2-input vertical stack", "vstack=inputs=2" in f_st, True)
+    check("stacked facecam scaled to 720px height", "scale=1080:720" in f_st, True)
+    check("stacked gameplay scaled to 1200px height", "scale=1080:1200" in f_st, True)
+    check("stacked crops the facecam from source", "crop=300:170:0:0" in f_st, True)
+    check("stacked without a webcam falls back to full screen crop",
+          "scale=1080:1920" in render._filter("stacked", 1920, None) and "vstack" not in render._filter("stacked", 1920, None), True)
+    # custom normalized stacked_crops
+    custom_crops = {"cam": [0.6, 0.1, 0.3, 0.2], "game": [0.1, 0.2, 0.8, 0.6]}
+    f_custom = render._filter("stacked", 1920, stacked_crops=custom_crops, src_w=1920, src_h=1080)
+    check("stacked with custom crops uses 2-input vertical stack", "vstack=inputs=2" in f_custom, True)
+    check("stacked custom cam crop matches coordinates", "crop=576:216:1152:108" in f_custom, True)
+    check("stacked custom game crop matches coordinates", "crop=1536:648:192:216" in f_custom, True)
+    check("stacked hook heading sits on seam at y=720", render._hook_y("stacked", 300, None), 720)
+    ev_st = render._stacked_hook_events("CLUTCH PLAY", 10.0, 720)
+    check("stacked hook events generate white text with black border", any(r"\c&HFFFFFF&\3c&H000000&\bord7" in line and r"\pos(540," in line for line in ev_st), True)
+    check("stacked hook has no background box", not any(r"\p1" in line for line in ev_st), True)
+    # color emoji hook rendering
+    check("has_emoji detects emoji characters", render.has_emoji("SOMEONE SAW ME 😱 🙏"), True)
+    check("has_emoji returns False for plain text", render.has_emoji("SOMEONE SAW ME"), False)
+    toks = render.tokenize_emoji("HOT 🔥 PLAY")
+    check("tokenize_emoji splits into text and emoji", len(toks) == 3 and toks[1] == ("emoji", "🔥"), True)
+    ass_no_hook = render.build_ass([], 0, 10, "SOMEONE SAW ME 😱 🙏", "bounce", [], 720, 1420, layout="stacked", include_hook=False)
+    check("build_ass with include_hook=False excludes hook dialogue", not any(line.startswith("Dialogue:") and "Hook" in line for line in ass_no_hook.splitlines()), True)
+    test_img = os.path.join(work, "test_hook.png")
+    render.render_hook_image("SOMEONE SAW ME 😱 🙏", "stacked", 720, test_img)
+    check("render_hook_image creates image file", os.path.exists(test_img), True)
     # the heading must not run under the webcam picture
     pip_h = 380 * 376 / 363
     check("the heading goes below the webcam picture", render._hook_y("gameplay", 300, [0, 0, 363, 376]) > 26 + pip_h, True)

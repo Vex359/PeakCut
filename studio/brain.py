@@ -162,6 +162,14 @@ def _overlaps(s, e, others):
     return any(min(e, k["end"]) - max(s, k["start"]) > 0.3 * (e - s) for k in others)
 
 
+def _overlaps_existing(s, e, existing):
+    for k in existing:
+        ov = min(e, k.get("end", 0)) - max(s, k.get("start", 0))
+        if ov > 2.0:
+            return True
+    return False
+
+
 def make_lines(words, loud=None, chat=None):
     """Group words into caption-ish lines: [{'s','e','text','loud'}]."""
     lines, cur = [], []
@@ -278,14 +286,21 @@ def _snap(clip, lines, words, min_len, max_len, duration):
     return round(max(0.0, s - 0.15), 2), round(min(duration, e + tail), 2)
 
 
-def fallback_by_loudness(db, words, n, max_len, duration):
+def fallback_by_loudness(db, words, n, max_len, duration, existing=()):
     """No AI available: take the loudest stretches that contain speech."""
-    z = loud_zscore(db)
-    picks, order = [], np.argsort(-z)
+    if db is not None and len(db) >= 5:
+        z = loud_zscore(db)
+        order = np.argsort(-z)
+    else:
+        # No db provided: evenly space through speech timestamps
+        order = [int(w["s"]) for w in words[::max(1, len(words) // max(n * 2, 1))]]
+    picks = []
     for sec in order:
         s = max(0.0, float(sec) - max_len * 0.6)
         e = min(duration, s + max_len)
         if any(not (e <= p["start"] or s >= p["end"]) for p in picks):
+            continue
+        if _overlaps_existing(s, e, existing):
             continue
         if not any(s <= w["s"] <= e for w in words):
             continue
@@ -306,9 +321,9 @@ def _game_rules(game):
     return GAME_RULES.format(game=_safe(games.name_of(game) or str(game), 40), tags=tags)
 
 
-def find_clips(words, db, duration, title="", uploader="", max_clips=6, min_len=15, max_len=60, log=print, game=None):
-    z = loud_zscore(db)
-    lines = make_lines(words, z)
+def find_clips(words, db, duration, title="", uploader="", max_clips=6, min_len=15, max_len=60, log=print, game=None, existing=()):
+    z = loud_zscore(db) if db is not None and len(db) >= 5 else np.zeros(0)
+    lines = make_lines(words, z if len(z) else None)
     if not lines:
         return [], {"model": None, "note": "No speech found."}
     found, used_model, tokens = [], None, 0
@@ -334,15 +349,15 @@ def find_clips(words, db, duration, title="", uploader="", max_clips=6, min_len=
             log(f"AI window {a:.0f}-{b:.0f}s failed: {e}")
     note = ""
     if not used_model:
-        found = fallback_by_loudness(db, words, max_clips, max_len, duration)
+        found = fallback_by_loudness(db, words, max_clips, max_len, duration, existing=existing)
         note = "The AI was unavailable, so clips were picked by loudness only."
     clips = []
     for c in sorted(found, key=lambda c: -_num(c.get("score"))):
         s, e = _snap(c, lines, words, min_len, max_len, duration)
         if e - s < min(min_len, duration) - 1:
             continue
-        if _overlaps(s, e, clips):
-            continue  # overlaps a better clip
+        if _overlaps(s, e, clips) or _overlaps_existing(s, e, existing):
+            continue  # overlaps a better clip or existing clip
         clips.append(_tidy(c, s, e, game))
         if len(clips) >= max_clips:
             break

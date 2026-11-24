@@ -215,6 +215,14 @@ def ai_key() -> str:
     return _secret("PEAKCUT_AI_KEY", "PEAKCUT_AI_KEY_FILE", r"\S{8,}")
 
 
+def ai_keys() -> list:
+    raw = env("PEAKCUT_AI_KEYS") or ""
+    if raw:
+        return [k.strip() for k in re.split(r"[\r\n,;]+", raw) if k.strip()]
+    k = ai_key()
+    return [k] if k else []
+
+
 def ai_ready() -> bool:
     from . import ai
     return ai.ready()

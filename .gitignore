@@ -25,6 +25,7 @@ Thumbs.db
 .DS_Store
 
 # ---- Python
+editor/
 __pycache__/
 *.py[cod]
 .venv/

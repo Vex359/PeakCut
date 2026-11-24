@@ -39,6 +39,79 @@ NO_KEY = {"ollama", "custom"}       # a model running on your own machine needs 
 _lock = threading.Lock()
 _saved = {"at": None, "data": {}}
 
+_key_lock = threading.Lock()
+_key_cursor = 0
+_key_cooldowns: dict[str, float] = {}   # key -> timestamp when cooldown ends
+
+
+def _parse_keys(v) -> list:
+    """Parse one or multiple keys from a string (newline, comma, or semicolon separated) or a list."""
+    if not v:
+        return []
+    if isinstance(v, (list, tuple)):
+        raw = [str(x).strip() for x in v]
+    else:
+        raw = [x.strip() for x in re.split(r"[\r\n,;]+", str(v))]
+    seen = set()
+    out = []
+    for k in raw:
+        if k and k not in seen:
+            seen.add(k)
+            out.append(k)
+    return out
+
+
+def _get_key_chain(ks: list) -> list:
+    """Return keys ordered by round-robin rotation, prioritizing keys not currently on cooldown."""
+    if not ks:
+        return [""]
+    if len(ks) == 1:
+        return list(ks)
+
+    import time
+    now = time.time()
+    with _key_lock:
+        global _key_cursor
+        idx = _key_cursor % len(ks)
+        _key_cursor = (idx + 1) % len(ks)
+        rotated = ks[idx:] + ks[:idx]
+
+    available = [k for k in rotated if _key_cooldowns.get(k, 0) <= now]
+    cooling = [k for k in rotated if _key_cooldowns.get(k, 0) > now]
+    cooling.sort(key=lambda k: _key_cooldowns.get(k, 0))
+    return available + cooling if available else cooling
+
+
+def _note_cooldown(k: str, wait_seconds: float = 60.0):
+    if not k:
+        return
+    import time
+    with _key_lock:
+        _key_cooldowns[k] = time.time() + max(5.0, wait_seconds)
+
+
+def _clear_cooldown(k: str):
+    if not k:
+        return
+    with _key_lock:
+        _key_cooldowns.pop(k, None)
+
+
+def _is_rate_limited(err: Exception) -> tuple:
+    """Check if an error represents a rate limit, quota exhaustion, or temporary overload.
+    Returns (is_limited, wait_seconds)."""
+    text = str(err)
+    low = text.lower()
+    wait = getattr(err, "wait", None)
+    is_429 = "429" in text or "too many requests" in low
+    is_503 = "503" in text or "service unavailable" in low
+    is_quota = any(w in low for w in ("rate limit", "rate_limit", "quota", "resource_exhausted", "resource has been exhausted", "tpm", "rpm", "rpd", "insufficient_quota"))
+    is_auth_error = any(w in low for w in ("401", "403", "unauthorized", "forbidden", "invalid_api_key", "invalid api key"))
+    if is_429 or is_503 or is_quota or is_auth_error:
+        w = wait if (wait is not None and wait > 0) else 60.0
+        return True, w
+    return False, 0.0
+
 
 def _file():
     return config.DATA_DIR / "ai.json"
@@ -61,13 +134,25 @@ def _from_dashboard() -> dict:
 
 
 def current() -> dict:
-    """Provider, models, address and key: what the dashboard saved, or else what .env says."""
+    """Provider, models, address and keys: what the dashboard saved, or else what .env says."""
     d = _from_dashboard()
     p = str(d.get("provider") or config.AI_PROVIDER or "").strip().lower()
-    return {"provider": ALIASES.get(p, p),
+    p_norm = ALIASES.get(p, p)
+    if d.get("provider"):
+        if "keys" in d and isinstance(d["keys"], list):
+            ks = [str(k).strip() for k in d["keys"] if str(k).strip()]
+        elif "key" in d and d["key"]:
+            ks = _parse_keys(d["key"])
+        else:
+            ks = []
+    else:
+        ks = config.ai_keys()
+    primary = ks[0] if ks else (str(d.get("key")) if d.get("key") else config.ai_key())
+    return {"provider": p_norm,
             "models": list(d["models"]) if d.get("provider") else list(config.AI_MODELS),
             "base_url": (str(d.get("base_url") or "") if d.get("provider") else config.AI_BASE_URL).rstrip("/"),
-            "key": str(d["key"]) if d.get("provider") and "key" in d else config.ai_key()}
+            "key": primary,
+            "keys": ks}
 
 
 def provider() -> str:
@@ -82,6 +167,10 @@ def key() -> str:
     return current()["key"]
 
 
+def keys() -> list:
+    return current()["keys"]
+
+
 def label() -> str:
     return PROVIDERS.get(provider(), ("",))[0]
 
@@ -93,23 +182,27 @@ def base_url() -> str:
 
 def ready() -> bool:
     c = current()
-    return bool(c["provider"] in PROVIDERS and c["models"] and base_url() and (c["key"] or c["provider"] in NO_KEY))
+    has_k = bool(c["keys"] or c["key"])
+    return bool(c["provider"] in PROVIDERS and c["models"] and base_url() and (has_k or c["provider"] in NO_KEY))
 
 
 def public() -> dict:
-    """What the settings page may see. The key itself never leaves the server: only whether there is one, and
-    its last four characters so the owner can tell which key it is."""
+    """What the settings page may see. The key itself never leaves the server: only whether there is one,
+    the count of keys, and hints so the owner can tell which keys are configured."""
     c = current()
-    return {"provider": c["provider"], "models": c["models"], "base_url": c["base_url"], "has_key": bool(c["key"]),
-            "key_hint": c["key"][-4:] if len(c["key"]) >= 12 else "", "ready": ready(), "label": label(),
+    ks = c["keys"] or ([c["key"]] if c["key"] else [])
+    hints = [k[-4:] for k in ks if len(k) >= 8]
+    return {"provider": c["provider"], "models": c["models"], "base_url": c["base_url"], "has_key": bool(ks),
+            "key_count": len(ks), "key_hint": hints[0] if hints else "", "key_hints": hints,
+            "ready": ready(), "label": label(),
             "saved_here": bool(_from_dashboard().get("provider")),
             "providers": [{"id": k, "label": v[0], "address": v[1], "needs_key": k not in NO_KEY, "key_url": v[3], "example": v[4]}
                           for k, v in PROVIDERS.items()]}
 
 
 def save(provider_id: str, model_ids, address: str = "", new_key=None) -> dict:
-    """Save the choice made in the dashboard. `new_key` None keeps the key that is already there (the page never
-    has it to send back); an empty string removes it."""
+    """Save the choice made in the dashboard. `new_key` None keeps the keys that are already there (the page never
+    has them to send back); an empty string removes them. Multiple keys can be separated by newlines or commas."""
     p = ALIASES.get(str(provider_id or "").strip().lower(), str(provider_id or "").strip().lower())
     if p not in PROVIDERS:
         raise ValueError("Choose one of the AI services in the list.")
@@ -126,19 +219,27 @@ def save(provider_id: str, model_ids, address: str = "", new_key=None) -> dict:
     if p == "custom" and not address:
         raise ValueError("A custom service needs its address, for example http://127.0.0.1:1234/v1")
     old = current()
-    k = old["key"] if new_key is None and old["provider"] == p else str(new_key or "").strip()[:400]
-    if not k and p not in NO_KEY:
+    if new_key is None and old["provider"] == p:
+        ks = list(old["keys"] or ([old["key"]] if old["key"] else []))
+    else:
+        ks = _parse_keys(new_key)
+    if not ks and p not in NO_KEY:
         raise ValueError("Paste the key for this service.")
+    primary = ks[0] if ks else ""
     with _lock:
         f = _file()
         tmp = f.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"provider": p, "models": ms, "base_url": address, "key": k}), encoding="utf-8")
+        tmp.write_text(json.dumps({"provider": p, "models": ms, "base_url": address, "key": primary, "keys": ks}), encoding="utf-8")
         try:
             os.chmod(tmp, 0o600)        # the key is only for whoever runs the server
         except OSError:
             pass
         tmp.replace(f)
         _saved["at"] = None
+    with _key_lock:
+        _key_cooldowns.clear()
+        global _key_cursor
+        _key_cursor = 0
     return public()
 
 
@@ -148,20 +249,43 @@ def list_models(provider_id=None, address=None, with_key=None) -> list:
     p = ALIASES.get(str(provider_id or c["provider"]).lower(), str(provider_id or c["provider"]).lower())
     if p not in PROVIDERS:
         raise ValueError("Choose one of the AI services in the list.")
-    k = str(with_key or "").strip() or (c["key"] if c["provider"] == p else "")
+    if with_key:
+        ks = _parse_keys(with_key)
+    elif c["provider"] == p:
+        ks = list(c["keys"] or ([c["key"]] if c["key"] else []))
+    else:
+        ks = []
     base = str(address or "").strip().rstrip("/") or (c["base_url"] if c["provider"] == p else "") or PROVIDERS[p][1]
     if not base:
         raise ValueError("Enter the service's address first.")
     how = PROVIDERS[p][2]
-    if how == "gemini":
-        r = httpx.get(base, params={"pageSize": 200}, headers={"x-goog-api-key": k}, timeout=20)
-    elif how == "anthropic":
-        r = httpx.get(f"{base}/models", params={"limit": 200}, headers={"x-api-key": k, "anthropic-version": "2023-06-01"}, timeout=20)
-    else:
-        r = httpx.get(f"{base}/models", headers={"Authorization": f"Bearer {k}"} if k else {}, timeout=20)
-    if r.status_code != 200:
-        raise AIError(f"HTTP {r.status_code} {r.text[:200].replace(k or chr(0), '<key>')}")
-    data = r.json()
+    if not ks and p not in NO_KEY:
+        raise ValueError("Enter the service's key first.")
+
+    target_keys = ks or [""]
+    last_err = None
+    data = None
+    for i, k in enumerate(target_keys):
+        try:
+            if how == "gemini":
+                r = httpx.get(base, params={"pageSize": 200}, headers={"x-goog-api-key": k}, timeout=20)
+            elif how == "anthropic":
+                r = httpx.get(f"{base}/models", params={"limit": 200}, headers={"x-api-key": k, "anthropic-version": "2023-06-01"}, timeout=20)
+            else:
+                r = httpx.get(f"{base}/models", headers={"Authorization": f"Bearer {k}"} if k else {}, timeout=20)
+            if r.status_code != 200:
+                raise AIError(f"HTTP {r.status_code} {r.text[:200].replace(k or chr(0), '<key>')}")
+            data = r.json()
+            break
+        except Exception as e:
+            last_err = e
+            if i < len(target_keys) - 1:
+                continue
+            raise
+
+    if data is None and last_err:
+        raise last_err
+
     if how == "gemini":
         found = []
         for m in data.get("models", []):
@@ -213,6 +337,9 @@ def explain(e) -> str:
             or (status and "is not found for api version" in low):
         return f"{label()} doesn't know the model \"{name}\". Open Settings, AI, press Find models and pick one from the list."
     if "429" in text or "quota" in low or "rate limit" in low or "exhausted" in low:
+        ks = keys()
+        if len(ks) > 1:
+            return f"All {len(ks)} {label()} keys have hit their rate limits or run out of quota. Add another key under Settings, AI, or try again later."
         return f"{label()} says the key has hit its limit or has no credit left. Check the account with {label()}, or try again later."
     if "connect" in low or "timed out" in low or "timeout" in low or "getaddrinfo" in low or "refused" in low or "nodename" in low or "servname" in low or "nameresolutionerror" in low or "name resolution" in low:
         return f"PeakCut couldn't reach {label()}. Check the internet connection" + (" and that Ollama is running." if provider() == "ollama" else ".")
@@ -242,8 +369,12 @@ def asked_wait(r) -> float | None:
     return float(m.group(1)) if m else None
 
 
-def _fail(r, model):
-    text = r.text[:300].replace(key() or "\0", "<key>")
+def _fail(r, model, api_key=None):
+    k = api_key or key()
+    text = r.text[:300].replace(k or "\0", "<key>")
+    for active_k in keys():
+        if active_k:
+            text = text.replace(active_k, "<key>")
     limited = r.status_code in (429, 503)
     raise AIError(f"HTTP {r.status_code} {text}", wait=asked_wait(r) if limited else None,
                   daily=limited and bool(re.search(r"PerDay|per day|daily", r.text or "", re.I)))
@@ -326,11 +457,34 @@ def _parse(text):
 # ---------------------------------------------------------------- one call
 def call(model: str, prompt: str, schema: dict, timeout: float | None = None):
     """Ask one model. Returns (the parsed JSON answer, tokens sent, tokens written back).
+    Rotates across configured API keys and falls back to the next key if rate limits occur."""
+    p = provider()
+    ks = keys()
+    if not ks:
+        if p not in NO_KEY:
+            raise AIError("No API key configured for " + label())
+        ks = [""]
 
-    `timeout` is how long one answer may take. A live stream passes a short one, because a slow
-    answer must not stop the recording."""
-    how = PROVIDERS[provider()][2]
-    return {"gemini": _gemini, "openai": _openai, "anthropic": _anthropic}[how](model, prompt, schema, timeout)
+    chain = _get_key_chain(ks)
+    how = PROVIDERS[p][2]
+    fn = {"gemini": _gemini, "openai": _openai, "anthropic": _anthropic}[how]
+
+    last_err = None
+    for i, k in enumerate(chain):
+        try:
+            res = fn(model, prompt, schema, timeout=timeout, api_key=k)
+            _clear_cooldown(k)
+            return res
+        except Exception as e:
+            last_err = e
+            is_limited, wait_secs = _is_rate_limited(e)
+            if is_limited and i < len(chain) - 1:
+                _note_cooldown(k, wait_secs)
+                continue
+            raise
+
+    if last_err:
+        raise last_err
 
 
 def see(prompt: str, image: bytes, timeout: float | None = None) -> tuple[str, int, int]:
@@ -343,43 +497,68 @@ def see(prompt: str, image: bytes, timeout: float | None = None) -> tuple[str, i
         return "", 0, 0
     model = models()[0]
     b64 = base64.b64encode(image).decode()
-    how = PROVIDERS[provider()][2]
-    if how == "gemini":
-        body = {"contents": [{"role": "user", "parts": [
-            {"text": prompt},
-            {"inline_data": {"mimeType": "image/jpeg", "data": b64}}]}]}
-        r = httpx.post(f"{base_url()}/{_gem(model)}:generateContent", json=body,
-                       headers={"x-goog-api-key": key()}, timeout=timeout or 120)
-        if r.status_code != 200:
-            _fail(r, model)
-        data = r.json()
-        text = "".join(p.get("text", "") for p in data["candidates"][0]["content"]["parts"])
-        u = data.get("usageMetadata", {})
-        sent = int(u.get("promptTokenCount") or 0)
-        return text, sent, max(0, int(u.get("totalTokenCount") or 0) - sent)
-    if how == "anthropic":
-        body = {"model": model, "max_tokens": 300, "messages": [{"role": "user", "content": [
-            {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
-            {"type": "text", "text": prompt}]}]}
-        r = httpx.post(f"{base_url()}/messages", json=body, timeout=timeout or 120,
-                       headers={"x-api-key": key(), "anthropic-version": "2023-06-01"})
-        if r.status_code != 200:
-            _fail(r, model)
-        data = r.json()
-        text = "".join(p.get("text", "") for p in data.get("content") or [] if p.get("type") == "text")
-        u = data.get("usage") or {}
-        return text, int(u.get("input_tokens") or 0), int(u.get("output_tokens") or 0)
-    headers = {"Authorization": f"Bearer {key()}"} if key() else {}
-    body = {"model": model, "stream": False, "messages": [{"role": "user", "content": [
-        {"type": "text", "text": prompt},
-        {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + b64}}]}]}
-    r = httpx.post(f"{base_url()}/chat/completions", json=body, headers=headers, timeout=timeout or 120)
-    if r.status_code != 200:
-        _fail(r, model)
-    data = _openai_body(r)
-    text = (data["choices"][0]["message"].get("content") or "")
-    u = data.get("usage") or {}
-    return text, int(u.get("prompt_tokens") or 0), int(u.get("completion_tokens") or 0)
+    p = provider()
+    ks = keys()
+    if not ks:
+        if p not in NO_KEY:
+            return "", 0, 0
+        ks = [""]
+
+    chain = _get_key_chain(ks)
+    how = PROVIDERS[p][2]
+
+    last_err = None
+    for i, k in enumerate(chain):
+        try:
+            if how == "gemini":
+                body = {"contents": [{"role": "user", "parts": [
+                    {"text": prompt},
+                    {"inline_data": {"mimeType": "image/jpeg", "data": b64}}]}]}
+                r = httpx.post(f"{base_url()}/{_gem(model)}:generateContent", json=body,
+                               headers={"x-goog-api-key": k}, timeout=timeout or 120)
+                if r.status_code != 200:
+                    _fail(r, model, api_key=k)
+                data = r.json()
+                text = "".join(p.get("text", "") for p in data["candidates"][0]["content"]["parts"])
+                u = data.get("usageMetadata", {})
+                sent = int(u.get("promptTokenCount") or 0)
+                _clear_cooldown(k)
+                return text, sent, max(0, int(u.get("totalTokenCount") or 0) - sent)
+            if how == "anthropic":
+                body = {"model": model, "max_tokens": 300, "messages": [{"role": "user", "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
+                    {"type": "text", "text": prompt}]}]}
+                r = httpx.post(f"{base_url()}/messages", json=body, timeout=timeout or 120,
+                               headers={"x-api-key": k, "anthropic-version": "2023-06-01"})
+                if r.status_code != 200:
+                    _fail(r, model, api_key=k)
+                data = r.json()
+                text = "".join(p.get("text", "") for p in data.get("content") or [] if p.get("type") == "text")
+                u = data.get("usage") or {}
+                _clear_cooldown(k)
+                return text, int(u.get("input_tokens") or 0), int(u.get("output_tokens") or 0)
+            headers = {"Authorization": f"Bearer {k}"} if k else {}
+            body = {"model": model, "stream": False, "messages": [{"role": "user", "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + b64}}]}]}
+            r = httpx.post(f"{base_url()}/chat/completions", json=body, headers=headers, timeout=timeout or 120)
+            if r.status_code != 200:
+                _fail(r, model, api_key=k)
+            data = _openai_body(r)
+            text = (data["choices"][0]["message"].get("content") or "")
+            u = data.get("usage") or {}
+            _clear_cooldown(k)
+            return text, int(u.get("prompt_tokens") or 0), int(u.get("completion_tokens") or 0)
+        except Exception as e:
+            last_err = e
+            is_limited, wait_secs = _is_rate_limited(e)
+            if is_limited and i < len(chain) - 1:
+                _note_cooldown(k, wait_secs)
+                continue
+            raise
+
+    if last_err:
+        raise last_err
 
 
 def _gem(model: str) -> str:
@@ -387,9 +566,10 @@ def _gem(model: str) -> str:
     return model.removeprefix("models/")
 
 
-def _gemini(model, prompt, schema, timeout=None):
+def _gemini(model, prompt, schema, timeout=None, api_key=None):
+    k = api_key if api_key is not None else key()
     url = f"{base_url()}/{_gem(model)}:generateContent"
-    headers = {"x-goog-api-key": key()}
+    headers = {"x-goog-api-key": k}
     body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.4, "responseMimeType": "application/json", "responseSchema": schema}}
     r = httpx.post(url, json=body, headers=headers, timeout=timeout or 120)
@@ -400,7 +580,7 @@ def _gemini(model, prompt, schema, timeout=None):
         r = httpx.post(url, json=plain, headers=headers, timeout=timeout or 120)
         used_plain = True
     if r.status_code != 200:
-        _fail(r, model)
+        _fail(r, model, api_key=k)
     data = r.json()
     text = "".join(p.get("text", "") for p in data["candidates"][0]["content"]["parts"])
     u = data.get("usageMetadata", {})
@@ -460,8 +640,9 @@ def _from_events(text: str) -> dict:
     return {"choices": [{"message": message}], "usage": usage}
 
 
-def _openai(model, prompt, schema, timeout=None):
-    headers = {"Authorization": f"Bearer {key()}"} if key() else {}
+def _openai(model, prompt, schema, timeout=None, api_key=None):
+    k = api_key if api_key is not None else key()
+    headers = {"Authorization": f"Bearer {k}"} if k else {}
     body = {"model": model, "messages": [{"role": "user", "content": _wrapped(prompt, schema)}], "stream": False}
     # Most services accept these two extras; a few models refuse one of them, so they are dropped on a refusal.
     extras = [{"temperature": 0.4, "response_format": {"type": "json_object"}}, {"response_format": {"type": "json_object"}}, {}]
@@ -471,18 +652,19 @@ def _openai(model, prompt, schema, timeout=None):
         if r.status_code not in (400, 422):
             break
     if r.status_code != 200:
-        _fail(r, model)
+        _fail(r, model, api_key=k)
     data = _openai_body(r)
     u = data.get("usage") or {}
     return _parse(data["choices"][0]["message"].get("content")), int(u.get("prompt_tokens") or 0), int(u.get("completion_tokens") or 0)
 
 
-def _anthropic(model, prompt, schema, timeout=None):
+def _anthropic(model, prompt, schema, timeout=None, api_key=None):
+    k = api_key if api_key is not None else key()
     body = {"model": model, "max_tokens": 8192, "messages": [{"role": "user", "content": _wrapped(prompt, schema)}]}
     r = httpx.post(f"{base_url()}/messages", json=body, timeout=timeout or 180,
-                   headers={"x-api-key": key(), "anthropic-version": "2023-06-01"})
+                   headers={"x-api-key": k, "anthropic-version": "2023-06-01"})
     if r.status_code != 200:
-        _fail(r, model)
+        _fail(r, model, api_key=k)
     data = r.json()
     text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
     u = data.get("usage") or {}

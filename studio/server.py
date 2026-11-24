@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -989,6 +990,22 @@ def upload_cancel(upid: str):
     return {"ok": True}
 
 
+@app.post("/api/jobs/{jid}/add_clips")
+def add_clips_route(jid: str, body: dict = Body(...)):
+    _need_verified()
+    job = _job_or_404(jid)
+    if job.get("status") in ("queued", "running"):
+        raise HTTPException(409, "This video is still being processed. Wait until it finishes before adding more clips.")
+    _throttle("addclips:" + ctx.uid(), 30, 600, "Too many requests. Wait a few minutes.")
+    try:
+        new_clips = jobs.add_clips_to_job(job, body)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Could not add clips: {e}")
+    return {"ok": True, "job": jobs.public(job), "added": [c["id"] for c in new_clips]}
+
+
 @app.post("/api/jobs/{jid}/clips/{cid}/render")
 def rerender(jid: str, cid: str, body: dict = Body(...)):
     job = _job_or_404(jid)
@@ -1011,6 +1028,72 @@ def _clip_or_404(jid: str, cid: str):
     if not clip:
         raise HTTPException(404, "No such clip")
     return job, clip
+
+
+@app.get("/api/jobs/{jid}/clips/{cid}/frame")
+def clip_frame(jid: str, cid: str, t: float = 0.0):
+    """Extract an uncropped source frame from the clip at timestamp t (offset in seconds from clip start)."""
+    job, clip = _clip_or_404(jid, cid)
+    src_path = clip.get("src") or job.get("source_path")
+    src_file = None
+    if src_path:
+        for cand in [Path(src_path), Path(job.get("dir", "")) / src_path, config.ROOT / src_path]:
+            try:
+                if cand and cand.is_file():
+                    src_file = cand.resolve()
+                    break
+            except Exception:
+                pass
+    if not src_file:
+        try:
+            jobs._piece_again(job, clip)
+            src_path = clip.get("src")
+            if src_path:
+                for cand in [Path(src_path), Path(job.get("dir", "")) / src_path, config.ROOT / src_path]:
+                    try:
+                        if cand and cand.is_file():
+                            src_file = cand.resolve()
+                            break
+                    except Exception:
+                        pass
+        except Exception as e:
+            raise HTTPException(404, f"Source video not found: {e}")
+    if not src_file:
+        raise HTTPException(404, "Source video not found.")
+
+    src = src_file
+    start = clip.get("start", 0.0)
+    end = clip.get("end", start + 30.0)
+    dur = max(0.1, end - start)
+    offset = max(0.0, min(dur, float(t)))
+    abs_t = start + offset
+    off = clip.get("src_offset", 0.0)
+    seek_t = max(0.0, abs_t - off)
+
+    try:
+        res = subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-ss", f"{seek_t:.3f}", "-i", str(src),
+             "-frames:v", "1", "-q:v", "2", "-f", "image2", "pipe:1"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            creationflags=getattr(media, "NO_WINDOW", 0), timeout=15
+        )
+        if res.returncode != 0 or not res.stdout:
+            res = subprocess.run(
+                ["ffmpeg", "-y", "-v", "error", "-i", str(src), "-ss", f"{seek_t:.3f}",
+                 "-frames:v", "1", "-q:v", "2", "-f", "image2", "pipe:1"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                creationflags=getattr(media, "NO_WINDOW", 0), timeout=15
+            )
+        if not res.stdout:
+            raise HTTPException(500, "Could not extract frame from video.")
+        return Response(content=res.stdout, media_type="image/jpeg",
+                        headers={"Cache-Control": "private, max-age=300"})
+    except subprocess.TimeoutExpired:
+        raise HTTPException(504, "Frame extraction timed out.")
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(500, f"Error extracting frame: {e}")
 
 
 @app.put("/api/jobs/{jid}/clips/{cid}/text")

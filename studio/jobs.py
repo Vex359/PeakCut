@@ -128,6 +128,20 @@ def clean_options(options) -> dict:
         if k in ("hook_text", "description_text"):     # kept even when empty: it clears the creator's own text for this video
             out[k] = creators.clean_hook(v) if k == "hook_text" else creators.clean_description(v)
             continue
+        if k == "manual_clip":
+            if isinstance(v, dict):
+                try:
+                    ms = float(v.get("start", 0))
+                    me = float(v.get("end", 0))
+                    if not (math.isfinite(ms) and math.isfinite(me)) or ms < 0 or me <= ms:
+                        raise ValueError("Start and end times must be valid numbers with end after start.")
+                    if me - ms > 60.0 + 1e-3:
+                        raise ValueError("Manual clip duration cannot exceed 60 seconds.")
+                    out["manual_clip"] = {"start": round(ms, 2), "end": round(me, 2)}
+                    out["max_clips"] = 1
+                except (TypeError, ValueError) as e:
+                    raise ValueError(str(e))
+            continue
         if k not in DEFAULTS or v in ("", None):
             continue
         if k in LIMITS:
@@ -321,6 +335,8 @@ def create(source: dict, options: dict, enqueue=True, creator=None, kind="video"
     else:
         d, base, creator = config.user_dir(ctx.uid()) / "jobs" / jid, dict(DEFAULTS), None
     opts = {**base, **clean_options(options)}
+    if opts.get("manual_clip"):
+        opts["max_clips"] = 1
     if opts["min_len"] >= opts["max_len"]:
         opts["min_len"] = max(5, opts["max_len"] - 5)
     job = {"id": jid, "user": ctx.uid(), "kind": kind, "creator": creator, "dir": str(d), "created": time.time(), "source": source,
@@ -392,6 +408,22 @@ def request_render(jid, cid, changes: dict):
             new[k] = str(changes[k])[:{"hook": 60, "title": 100, "description": 2000}.get(k, 20)]
     if "hashtags" in changes:
         new["hashtags"] = clean_hashtags(changes["hashtags"])
+    if "stacked_crops" in changes:
+        sc = changes["stacked_crops"]
+        if isinstance(sc, dict) and "cam" in sc and "game" in sc:
+            clean_sc = {}
+            for k in ("cam", "game"):
+                box = sc.get(k)
+                if not (isinstance(box, (list, tuple)) and len(box) == 4):
+                    raise ValueError("Crop coordinates must have 4 numbers [x, y, w, h].")
+                try:
+                    box_nums = [max(0.0, min(1.0, float(v))) for v in box]
+                    if box_nums[2] <= 0 or box_nums[3] <= 0:
+                        raise ValueError("Crop width and height must be positive.")
+                    clean_sc[k] = box_nums
+                except (ValueError, TypeError) as e:
+                    raise ValueError(f"Crop coordinates aren't valid: {e}")
+            new["stacked_crops"] = clean_sc
     if new.get("style") not in render.STYLES:
         new["style"] = DEFAULTS["style"]
     if new.get("layout") not in render.LAYOUTS:
@@ -399,6 +431,121 @@ def request_render(jid, cid, changes: dict):
     clip.update(new, status="queued")
     save(job)
     _q.put(("clip", jid, cid))
+
+
+def add_clips_to_job(job: dict, body: dict) -> list:
+    """Add one or more clips to an existing job: either manual (start, end) or AI (count).
+    Ensures newly added clips do not duplicate or overlap already generated clips.
+    """
+    mode = str(body.get("mode", "ai")).lower()
+    o = job.get("options") or {}
+    d = Path(job["dir"])
+    words_file = d / "words.json"
+    words = []
+    if words_file.exists():
+        try:
+            words = json.loads(words_file.read_text(encoding="utf-8"))
+        except Exception:
+            words = []
+    game = job.get("creator")
+    existing_clips = job.get("clips") or []
+    existing_ids = {c["id"] for c in existing_clips}
+
+    face = None
+    stacked_crops = None
+    for c in existing_clips:
+        if c.get("facecam") and not face:
+            face = c["facecam"]
+        if c.get("stacked_crops") and not stacked_crops:
+            stacked_crops = c["stacked_crops"]
+
+    new_clips = []
+    if mode == "manual":
+        try:
+            start = float(body.get("start", 0))
+            end = float(body.get("end", 0))
+        except (ValueError, TypeError):
+            raise ValueError("Start and end times must be valid numbers.")
+        if not (math.isfinite(start) and math.isfinite(end)) or start < 0 or end <= start:
+            raise ValueError("Start and end times must be valid numbers with end after start.")
+        if end - start > 60.0 + 1e-3:
+            raise ValueError("Clip duration cannot exceed 60 seconds (must be 60s or less).")
+
+        # Check for heavy overlap with already generated clips
+        for c in existing_clips:
+            ov = min(end, c.get("end", 0)) - max(start, c.get("start", 0))
+            if ov > 0.7 * (end - start):
+                raise ValueError(f"This time range heavily overlaps already generated clip {c.get('id', '')}. Pick a different moment.")
+
+        cid = next(f"clip{i:02d}" for i in range(1, 1000) if f"clip{i:02d}" not in existing_ids)
+        clip_words = [w for w in words if start - 1.0 <= w["s"] <= end + 1.0]
+        clip_text = " ".join(w["w"] for w in clip_words)
+        desc_res = {}
+        if clip_text and not o.get("hook_text"):
+            try:
+                desc_res = brain.describe(clip_text, job.get("title", ""), job.get("uploader", ""), game)
+            except Exception:
+                pass
+
+        clip = {
+            "id": cid,
+            "start": round(start, 2),
+            "end": round(end, 2),
+            "style": o.get("style", DEFAULTS["style"]),
+            "layout": o.get("layout", DEFAULTS["layout"]),
+            "captions": o.get("captions", True),
+            "status": "queued",
+            "version": 0,
+            "score": 90,
+            "hook": o.get("hook_text") or desc_res.get("hook") or f"Clip {cid[4:]}",
+            "title": o.get("hook_text") or desc_res.get("title") or f"Clip {cid[4:]}",
+            "description": o.get("description_text") or desc_res.get("description") or "",
+            "hashtags": desc_res.get("hashtags") or [],
+            "category": "manual"
+        }
+        if face:
+            clip["facecam"] = face
+        if stacked_crops:
+            clip["stacked_crops"] = stacked_crops
+        new_clips.append(clip)
+    else:
+        try:
+            count = max(1, min(10, int(body.get("count", 1))))
+        except (ValueError, TypeError):
+            count = 1
+        if not words:
+            raise ValueError("No transcript available to find AI clips for this video.")
+        duration = float(job.get("duration") or (words[-1]["e"] if words else 0))
+        found, ai = brain.find_clips(words, None, duration, title=job.get("title", ""),
+                                     uploader=job.get("uploader", ""), max_clips=count,
+                                     min_len=int(o.get("min_len", 15)), max_len=int(o.get("max_len", 60)),
+                                     existing=existing_clips, game=game)
+        if not found:
+            raise ValueError("No new clip-worthy moments found that don't overlap with existing clips.")
+        for f in found:
+            cid = next(f"clip{i:02d}" for i in range(1, 1000) if f"clip{i:02d}" not in existing_ids and not any(c["id"] == f"clip{i:02d}" for c in new_clips))
+            c = dict(f)
+            c.update(id=cid, start=round(c["start"], 2), end=round(c["end"], 2),
+                     style=o.get("style", DEFAULTS["style"]), layout=o.get("layout", DEFAULTS["layout"]),
+                     captions=o.get("captions", True), status="queued", version=0)
+            if o.get("hook_text"):
+                c["hook"] = o["hook_text"]
+            if o.get("description_text"):
+                c["description"], c["fixed_description"] = o["description_text"], True
+            elif not c.get("description"):
+                hashtags.apply(c, words, job.get("title", ""), job.get("uploader", ""), game)
+            if face:
+                c["facecam"] = face
+            if stacked_crops:
+                c["stacked_crops"] = stacked_crops
+            new_clips.append(c)
+
+    for c in new_clips:
+        job["clips"].append(c)
+    save(job)
+    for c in new_clips:
+        _q.put(("clip", job["id"], c["id"]))
+    return new_clips
 
 
 def clean_hashtags(v) -> list:
@@ -462,8 +609,24 @@ def render_one(job, clip, words):
         src = Path(clip["src"]) if clip.get("src") else Path(job["source_path"])
         if not clip.get("src"):
             clip["end"] = min(clip["end"], job["duration"])
-        local = dict(clip, start=clip["start"] - off, end=clip["end"] - off, hook=roman.to_roman(clip.get("hook") or ""))
+        hook_text = clip.get("hook") if clip.get("hook") is not None else clip.get("title", "")
+        local = dict(clip, start=clip["start"] - off, end=clip["end"] - off, hook=roman.to_roman(hook_text or ""))
         near = _caption_words(job, clip, words, off) if clip.get("captions", True) else []
+        if clip.get("captions", True) and not near and src.exists():
+            try:
+                wav = d / "clips" / f"{clip['id']}_trans.wav"
+                media.extract_audio(src, wav)
+                audio_piece = media.load_audio(wav)
+                wav.unlink(missing_ok=True)
+                tw = transcribe.transcribe(audio_piece, lang=job.get("lang") or "en")
+                if tw:
+                    tw_adj = [dict(w, s=round(w["s"] + off, 2), e=round(w["e"] + off, 2)) for w in tw]
+                    words.extend(tw_adj)
+                    words.sort(key=lambda w: w["s"])
+                    (d / "words.json").write_text(json.dumps(words), encoding="utf-8")
+                    near = _caption_words(job, clip, words, off)
+            except Exception:
+                pass
         out = render.render_clip(src, d / "clips", clip["id"], local, near, job["width"], job["height"])
         clip.update(out, status="done", version=clip.get("version", 0) + 1, error=None)
         post = {k: clip[k] for k in ("title", "description", "hashtags", "hook", "start", "end", "score")}
@@ -674,6 +837,12 @@ def _run_job(job):
         if not job.get("thumb") and media.save_thumb(d, url=src["url"]):
             _set(job, thumb=True)
         usage.set_context(job["creator"], meta["title"])
+        if o.get("manual_clip"):
+            mc = o["manual_clip"]
+            if o.get("range_start") is None:
+                o["range_start"] = max(0.0, mc["start"] - 15.0)
+            if o.get("range_end") is None:
+                o["range_end"] = mc["end"] + 15.0
         span = (o["range_end"] or meta["duration"]) - (o["range_start"] or 0)
         pieces = span > LONG_VIDEO or meta["duration"] <= 0
         if not pieces:  # shorter video: fetch all of it in the background while the audio is worked on
@@ -830,19 +999,40 @@ def _run_job(job):
         (d / "words.json").write_text(json.dumps(words), encoding="utf-8")
         _set(job, stage="Finding the best moments" + where, word_count=len(words))
         left = int(o["max_clips"]) - len(job["clips"])
-        if left <= 0 or len(bw) < 8:
+        if left <= 0 or (len(bw) < 8 and not o.get("manual_clip")):
             job["done_blocks"] = bi + 1
             save(job)
             continue
-        quota = max(1, math.ceil(left / (len(blocks) - bi)))
-        s0 = int((a - lo) / 16000)
-        found, ai = brain.find_clips(bw, db[s0: s0 + int((b - a) / 16000) + 1], (b - a) / 16000, job["title"],
-                                     job["uploader"], quota, int(o["min_len"]), int(o["max_len"]), notes.append, game=game)
-        tokens += ai.get("tokens", 0)
-        model = ai.get("model") or model
-        if ai.get("note"):
-            notes.append(ai["note"])
-        if found and statics:
+        if o.get("manual_clip"):
+            mc = o["manual_clip"]
+            clip_words = [w for w in words if mc["start"] - 1.0 <= w["s"] <= mc["end"] + 1.0]
+            clip_text = " ".join(w["w"] for w in clip_words)
+            desc_res = {}
+            if clip_text and not o.get("hook_text"):
+                try:
+                    desc_res = brain.describe(clip_text, job["title"], job["uploader"], game)
+                except Exception:
+                    pass
+            found = [{
+                "start": mc["start"],
+                "end": mc["end"],
+                "score": 90,
+                "hook": o.get("hook_text") or desc_res.get("hook") or "Manual Clip",
+                "title": o.get("hook_text") or desc_res.get("title") or "Manual Clip",
+                "description": o.get("description_text") or desc_res.get("description") or "",
+                "hashtags": desc_res.get("hashtags") or [],
+                "category": "manual"
+            }]
+        else:
+            quota = max(1, math.ceil(left / (len(blocks) - bi)))
+            s0 = int((a - lo) / 16000)
+            found, ai = brain.find_clips(bw, db[s0: s0 + int((b - a) / 16000) + 1], (b - a) / 16000, job["title"],
+                                         job["uploader"], quota, int(o["min_len"]), int(o["max_len"]), notes.append, game=game)
+            tokens += ai.get("tokens", 0)
+            model = ai.get("model") or model
+            if ai.get("note"):
+                notes.append(ai["note"])
+        if found and statics and not o.get("manual_clip"):
             # A commercial or a "be right back" slate is not a clip. Any clip that sits mostly inside one
             # is dropped.
             keep = []
@@ -855,8 +1045,10 @@ def _run_job(job):
                     keep.append(c)
             found = keep
         for c in found:
-            c.update(id=f"clip{len(job['clips']) + 1:02d}", start=round(c["start"] + shift, 2),
-                     end=round(c["end"] + shift, 2), style=o["style"], layout=o["layout"],
+            s_final = c["start"] if o.get("manual_clip") else round(c["start"] + shift, 2)
+            e_final = c["end"] if o.get("manual_clip") else round(c["end"] + shift, 2)
+            c.update(id=f"clip{len(job['clips']) + 1:02d}", start=s_final,
+                     end=e_final, style=o["style"], layout=o["layout"],
                      captions=o.get("captions", True), status="queued", version=0)
             if o.get("hook_text"):        # the person's own big text, on every clip, in place of the AI's
                 c["hook"] = o["hook_text"]
@@ -864,9 +1056,9 @@ def _run_job(job):
                 c["description"], c["fixed_description"] = o["description_text"], True
             else:                          # no description of their own: 3 to 5 fitting hashtags go at the end of the AI's
                 hashtags.apply(c, words, job["title"], job["uploader"], game)
-            # Only the gameplay layout uses a webcam, so it is only looked for then, and only once: a
+            # Only layouts with facecam use a webcam, so it is only looked for then, and only once: a
             # stream with no webcam is not looked for again on every clip of it.
-            if o["layout"] == "gameplay" and face is False:
+            if o["layout"] in ("gameplay", "stacked") and face is False:
                 face = _facecam(job)
             if face:
                 c["facecam"] = face

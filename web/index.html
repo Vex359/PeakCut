@@ -397,6 +397,8 @@ img.av{object-fit:cover}
 .lay-prev.fit .ph{background:#000}.lay-prev.fit .ph::before{display:none}
 .lay-prev.split .ph i{top:0;height:23px;transform:none}
 .lay-prev.split .ph::before{inset:25px 0 0 0;filter:none;opacity:1;background:linear-gradient(135deg,#FFB27A,#FF8B33)}
+.lay-prev.stacked .ph i{left:0;right:0;top:0;height:37.5%;transform:none;background:#FFB27A}
+.lay-prev.stacked .ph::after{content:"";position:absolute;left:0;right:0;bottom:0;height:62.5%;background:linear-gradient(135deg,#FF8B33,#E06B1A)}
 .seg{display:flex;gap:4px;background:#fff;border-radius:10px;padding:4px}
 .composer.compact .seg{background:var(--muted)}
 .seg button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 6px;border:0;border-radius:7px;background:transparent;color:var(--dim);font-size:13px;font-weight:600;cursor:pointer;transition:background-color .15s ease,color .15s ease}
@@ -553,6 +555,14 @@ img.av{object-fit:cover}
 .danger-card{border-color:#F3C9C4}
 .danger-card h2{color:var(--bad)}
 .clip-foot{display:flex;gap:4px;align-items:center;margin-top:auto;padding-top:8px}
+.add-clip-tile{background:#fff;border:2px dashed var(--line-2,#E2D7CF);border-radius:var(--r);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;padding:24px 16px;min-height:280px;height:100%;box-sizing:border-box;transition:all .15s ease;color:var(--dim)}
+.add-clip-tile:hover{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-ink)}
+.add-clip-inner{display:flex;flex-direction:column;align-items:center;gap:10px}
+.add-clip-icon{width:48px;height:48px;border-radius:50%;background:rgba(255,139,51,0.14);color:var(--brand);display:grid;place-items:center;transition:transform .15s ease,background-color .15s ease,color .15s ease}
+.add-clip-tile:hover .add-clip-icon{background:var(--brand);color:#fff;transform:scale(1.08)}
+.add-clip-icon svg{width:22px;height:22px}
+.add-clip-label{font-size:14px;font-weight:600;color:inherit}
+.add-clip-sub{font-size:11px;color:var(--faint);margin-top:-4px}
 
 /* ---------- live */
 .livecard{background:#fff;border:1px solid #F4C9CD;border-radius:var(--r);padding:20px;margin-bottom:28px}
@@ -821,6 +831,40 @@ dialog[open]{animation:fadein .16s ease}
   .set-sec h2{font-size:16px}
   .ai-big{font-size:24px}
 }
+/* Stacked Gaming Crop Editor */
+#clipdlg.crop-dlg { max-width: 1060px; width: 95vw; padding: 0; border-radius: var(--r-lg); background: #FFFFFF; color: var(--text); border: 1px solid var(--line); box-shadow: 0 16px 40px rgba(0,0,0,0.14); overflow: hidden; }
+.crop-modal { display: flex; flex-direction: column; max-height: calc(100vh - 40px); background: #FFFFFF; color: var(--text); }
+.crop-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+.crop-head h3 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text); }
+.crop-head .sub { margin: 4px 0 0 0; font-size: 12px; color: var(--dim); }
+.crop-body { display: grid; grid-template-columns: 1fr 310px; gap: 20px; padding: 20px 22px; overflow-y: auto; background: #FFFFFF; }
+@media (max-width: 860px) { .crop-body { grid-template-columns: 1fr; } }
+.crop-main { display: flex; flex-direction: column; gap: 14px; }
+.crop-frame-wrap { position: relative; display: inline-block; width: 100%; aspect-ratio: 16 / 9; min-height: 240px; max-height: 440px; background: #0D0907; border-radius: 10px; overflow: hidden; line-height: 0; user-select: none; border: 1px solid var(--line); }
+.crop-source-img { width: 100%; max-height: 440px; display: block; object-fit: contain; margin: 0 auto; }
+.crop-overlay { position: absolute; inset: 0; pointer-events: none; }
+.crop-img-loading { position: absolute; inset: 0; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--brand); pointer-events: none; }
+.crop-rect { position: absolute; box-sizing: border-box; pointer-events: auto; cursor: move; }
+.crop-rect.cam { border: 2px solid #FF8B33; background: rgba(255, 139, 51, 0.18); }
+.crop-rect.game { border: 2px solid #2B7FFF; background: rgba(43, 127, 255, 0.18); }
+.crop-label { position: absolute; top: 4px; left: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 4px; pointer-events: none; white-space: nowrap; }
+.crop-rect.cam .crop-label { background: #FF8B33; color: #fff; }
+.crop-rect.game .crop-label { background: #2B7FFF; color: #fff; }
+.crop-h { position: absolute; width: 12px; height: 12px; background: #fff; border: 1.5px solid #211813; border-radius: 2px; }
+.crop-h.nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.crop-h.ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.crop-h.se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.crop-h.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.crop-scrubber-box { background: var(--muted); padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); }
+.crop-sidebar { display: flex; flex-direction: column; }
+.crop-preview-container { width: 220px; height: 391px; border-radius: 10px; overflow: hidden; background: #000; border: 1.5px solid var(--line); box-shadow: 0 4px 16px rgba(0,0,0,0.1); margin: 0 auto; display: flex; flex-direction: column; position: relative; }
+.crop-prev-cam { width: 100%; height: 37.5%; display: block; background: #14100E; }
+.crop-prev-game { width: 100%; height: 62.5%; display: block; background: #14100E; }
+.crop-prev-hook-overlay { position: absolute; left: 0; right: 0; top: 37.5%; transform: translateY(-50%); text-align: center; font-weight: 800; font-size: 13px; line-height: 1.15; color: #FFFFFF; text-transform: uppercase; padding: 0 8px; box-sizing: border-box; text-shadow: -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0px 2px 4px rgba(0,0,0,0.9); pointer-events: none; word-break: break-word; z-index: 2; }
+.crop-emoji-bar { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; padding: 6px 8px; background: var(--muted); border-radius: 8px; border: 1px solid var(--line); }
+.crop-emoji-btn { background: #FFFFFF; border: 1px solid var(--line-2); border-radius: 6px; font-size: 16px; line-height: 1; padding: 4px 6px; cursor: pointer; transition: transform 0.1s ease, background-color 0.1s ease; user-select: none; }
+.crop-emoji-btn:hover { background: var(--brand-soft); border-color: var(--brand-line); transform: scale(1.15); }
+.crop-emoji-btn:active { transform: scale(0.95); }
 </style>
 </head>
 <body>
@@ -842,6 +886,7 @@ dialog[open]{animation:fadein .16s ease}
 </div>
 <dialog id="clipdlg"></dialog>
 <dialog id="formdlg"></dialog>
+<dialog id="moreclipsdlg"></dialog>
 <input type="file" id="file" accept="video/*" multiple hidden>
 <div id="toasts" role="status" aria-live="polite"></div>
 <div class="pop" id="bellpop" role="dialog" aria-label="Notifications" hidden></div>
@@ -1376,8 +1421,26 @@ function drawAdd(variant) {
       <button type="button" class="chip" data-act="pickfile">${ic("up")}Upload video</button>
       ${c ? "" : picker("o_creator", "File under creator", [{v:"", label:"No creator", icon:"user"}, ...S.creators.map(x => ({v:x.id, label:x.name, img:x.profile?.pic && x.profile.channel === x.channel ? avatarUrl(x) : ""}))], "")}
       <button type="button" class="chip" data-act="toggleopts" aria-expanded="false">${ic("sliders")}Options</button>
+      <button type="button" class="chip" data-act="togglemanual" id="manualChip" aria-expanded="false">${ic("clock")}Manual</button>
       <span class="grow"></span><span class="hint">or drop a video file here</span>
       <button class="btn primary" id="goBtn">${ic("scissors")}Make clips</button>
+    </div>
+    <div class="composer-manual" id="composerManual" style="display:none;padding:12px 18px;border-top:1px solid var(--line);background:var(--muted);border-radius:0 0 var(--r) var(--r)">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:600;color:var(--brand-ink);display:flex;align-items:center;gap:6px">
+          ${ic("clock")}Manual clip:
+        </span>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text)">
+          <span>Start</span>
+          <input type="text" id="m_start" placeholder="00:00:00" autocomplete="off" style="width:95px;padding:6px 10px;font-size:13px;border:1px solid var(--line);border-radius:var(--r-sm);background:#fff;text-align:center;font-weight:600">
+        </label>
+        <span style="color:var(--dim)">to</span>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text)">
+          <span>End</span>
+          <input type="text" id="m_end" placeholder="00:00:45" autocomplete="off" style="width:95px;padding:6px 10px;font-size:13px;border:1px solid var(--line);border-radius:var(--r-sm);background:#fff;text-align:center;font-weight:600">
+        </label>
+        <span id="manualDurationInfo" style="font-size:12px;color:var(--dim)">Single clip (Max 60s)</span>
+      </div>
     </div>
     <div class="composer-opts" inert><div class="og">
       ${langSeg(c?.lang || "en")}
@@ -1403,7 +1466,7 @@ function drawAdd(variant) {
     </div></div></form>`;
   drawAtt();
 }
-const LAYOUT_SHORT = {blur:"Blurred fill", zoom:"Zoomed in", crop:"Fill screen", left:"Keep left", right:"Keep right", fit:"Black bars", split:"Split screen", gameplay:"Gameplay + facecam"};
+const LAYOUT_SHORT = {blur:"Blurred fill", zoom:"Zoomed in", crop:"Fill screen", left:"Keep left", right:"Keep right", fit:"Black bars", split:"Split screen", gameplay:"Gameplay + facecam", stacked:"Stacked gaming"};
 /* The language spoken in the video picks which speech model writes the transcript. Languages other than English
    need their model downloaded once (Settings → Speech models). */
 const LANG_NATIVE = {ar:"العربية"};
@@ -1472,12 +1535,75 @@ document.addEventListener("keydown", e => {
   os[(i + (e.key === "ArrowDown" ? 1 : -1) + os.length) % os.length].focus();
 });
 const targetCreator = () => creatorId() || $("#o_creator")?.value || "";
+function parseTimestamp(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  if (!s) return null;
+  const parts = s.split(":").map(p => Number(p.trim()));
+  if (parts.some(p => isNaN(p) || p < 0)) return null;
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  } else if (parts.length === 2) {
+    return parts[0] * 60 + parts[1];
+  } else if (parts.length === 1) {
+    return parts[0];
+  }
+  return null;
+}
+
+function updateManualDuration(startInput, endInput, infoEl) {
+  const sStr = startInput?.value.trim();
+  const eStr = endInput?.value.trim();
+  if (!sStr && !eStr) {
+    if (infoEl) infoEl.innerHTML = `Max 60s (Single clip)`;
+    return;
+  }
+  const sSec = parseTimestamp(sStr);
+  const eSec = parseTimestamp(eStr);
+  if (sSec === null || eSec === null) {
+    if (infoEl) infoEl.innerHTML = `<span style="color:var(--dim)">Enter valid timestamps (e.g. 00:01:00)</span>`;
+    return;
+  }
+  if (eSec <= sSec) {
+    if (infoEl) infoEl.innerHTML = `<span style="color:var(--bad)">End must be after start</span>`;
+    return;
+  }
+  const diff = Math.round((eSec - sSec) * 10) / 10;
+  if (diff > 60.0 + 1e-3) {
+    if (infoEl) infoEl.innerHTML = `<span style="color:var(--bad);font-weight:600">Duration: ${diff}s (Exceeds 60s limit!)</span>`;
+  } else {
+    if (infoEl) infoEl.innerHTML = `<span style="color:var(--ok,#3BA55D);font-weight:600">Duration: ${diff}s</span> (Valid)`;
+  }
+}
+
 function jobOptions() {
   const n = id => { const v = $(id).value; return v === "" ? null : Number(v); };
   const o = {max_clips:n("#o_max"), min_len:n("#o_min"), max_len:n("#o_maxlen"), captions:$("#o_captions").checked, style:$("#o_style").value, layout:$("#o_layout").value, quality:n("#o_quality"),
     hook_text:$("#o_hook").value.trim(), description_text:$("#o_desc").value.trim(), lang:$("#o_lang")?.value || "en"};
   if (n("#o_from") !== null) o.range_start = n("#o_from") * 60;
   if (n("#o_to") !== null) o.range_end = n("#o_to") * 60;
+
+  const mBox = $("#composerManual");
+  if (mBox && mBox.style.display !== "none") {
+    const sStr = $("#m_start")?.value.trim();
+    const eStr = $("#m_end")?.value.trim();
+    if (!sStr || !eStr) {
+      throw new Error("Please enter both start and end timestamps for the manual clip.");
+    }
+    const sSec = parseTimestamp(sStr);
+    const eSec = parseTimestamp(eStr);
+    if (sSec === null || eSec === null) {
+      throw new Error("Invalid timestamp format. Use HH:MM:SS or MM:SS (e.g. 00:01:30).");
+    }
+    if (eSec <= sSec) {
+      throw new Error("End time must be after start time.");
+    }
+    if (eSec - sSec > 60.0 + 1e-3) {
+      throw new Error("Clip duration cannot exceed 60 seconds (must be 60s or less).");
+    }
+    o.manual_clip = {start: sSec, end: eSec};
+    o.max_clips = 1;
+  }
   return o;
 }
 /* ---------- attachments: nothing starts until Make clips is pressed.
@@ -1591,6 +1717,7 @@ function onLink(input) {
   linkTimer = setTimeout(() => { if (input.value.trim() === u) takeLink(A, u, input); }, 900);   // other link shapes: take it once typing stops
 }
 document.addEventListener("input", e => { if (e.target.id === "url") onLink(e.target);
+  if (e.target.id === "m_start" || e.target.id === "m_end") updateManualDuration($("#m_start"), $("#m_end"), $("#manualDurationInfo"));
   if (e.target.closest?.("#cform") && e.target.dataset.k && !/checkbox|radio/.test(e.target.type)) dirty(true); });
 document.addEventListener("keydown", e => { if (e.target.id === "url" && e.key === "Enter" && e.target.value.trim() && looksLink(e.target.value.trim())) { e.preventDefault(); clearTimeout(linkTimer); takeLink(att(), e.target.value.trim(), e.target); } });
 document.addEventListener("click", e => {
@@ -1690,7 +1817,10 @@ async function makeClips() {
   $("#langnote")?.remove();
   A.busy = true; drawAtt();
   let started = 0, failed = 0;
-  const who = targetCreator(), opts = jobOptions();
+  let opts;
+  try { opts = jobOptions(); }
+  catch (err) { toast(err.message, "bad"); return; }
+  const who = targetCreator();
   for (const l of A.links.filter(x => x.state === "ok")) {
     l.sending = true; drawAtt();
     try { await send("/api/jobs", {url: l.url, options: opts, creator: who}); l.state = "done"; started++; }
@@ -1744,6 +1874,15 @@ function clipHtml(j, c) {
       </div>
     </div></article>`;
 }
+function addClipTile(j) {
+  return `<button type="button" class="clip add-clip-tile" data-act="addmoreclips" data-j="${j.id}" title="Generate another clip from this video" aria-label="Generate another clip">
+    <div class="add-clip-inner">
+      <span class="add-clip-icon">${ic("plus")}</span>
+      <span class="add-clip-label">Add clip</span>
+      <small class="add-clip-sub">AI or manual</small>
+    </div>
+  </button>`;
+}
 function spark(vals, cls, lo, hi) { return `<div class="spark ${cls}">${vals.map(v => `<i style="height:${Math.max(4, Math.min(100, (v - lo) / (hi - lo) * 100))}%"></i>`).join("")}</div>`; }
 const EVERY = [[1, "1 min", ""], [2, "2 min", ""], [3, "3 min", ""], [5, "5 min", ""], [10, "10 min", ""]];
 function everyPick(cid, v) {
@@ -1787,7 +1926,7 @@ function jobHtml(j) {
     ${busy ? `<div class="bar"><i style="width:${Math.round(j.progress * 100)}%"></i></div><p class="sub">${esc(j.stage)} · ${Math.round(j.progress * 100)}%</p>` : ""}
     ${j.status === "done" && !j.clips.length ? `<p class="sub">${esc(j.stage)}</p>` : ""}
     ${j.error ? `<div class="err">${esc(j.error)}<button class="rep" data-act="report" data-ctx="${esc("Video failed: " + (j.title || j.source.name || "") + " | " + j.error)}">Report this</button></div>` : ""}${j.ai?.note ? `<p class="sub">${esc(j.ai.note)}</p>` : ""}
-    ${j.clips.length ? `<div class="grid">${j.clips.map(c => clipHtml(j, c)).join("")}</div>` : ""}`;
+    ${j.clips.length ? `<div class="grid">${j.clips.map(c => clipHtml(j, c)).join("")}${!busy ? addClipTile(j) : ""}</div>` : ""}`;
 }
 /* ---- selecting several videos and clips: delete or download them together */
 const sel = () => (S.sel = S.sel || new Set());
@@ -2056,8 +2195,18 @@ const setTabs = () => [
 function aiHints() {
   const k = S.ai, sel = $("#ai_provider"); if (!k || !sel) return;
   const pv = k.providers.find(x => x.id === sel.value) || k.providers[0], same = pv.id === k.provider;
-  $("#ai_key").placeholder = same && k.has_key ? `Saved${k.key_hint ? ", ends in " + k.key_hint : ""}. Paste a new key to replace it` : pv.needs_key ? "Paste your key" : "Not needed";
-  $("#ai_keyhint").innerHTML = pv.key_url ? `${pv.needs_key ? "Get a key at" : "Set it up at"} <a href="${esc(pv.key_url)}" target="_blank" rel="noopener">${esc(pv.key_url.replace("https://", ""))}</a>. The key stays on this server and is never shown again.` : "The key stays on this server and is never shown again.";
+  const count = (same && k.has_key) ? (k.key_count || 1) : 0;
+  let ph = "Paste one or more keys (one per line or comma-separated)";
+  if (count > 1) {
+    ph = `Saved ${count} keys (${(k.key_hints || []).map(h => "…" + h).join(", ")}). Paste new keys to replace (one per line)`;
+  } else if (count === 1) {
+    ph = `Saved${k.key_hint ? ", ends in …" + k.key_hint : ""}. Paste new keys to replace (one per line)`;
+  } else if (!pv.needs_key) {
+    ph = "Not needed";
+  }
+  $("#ai_key").placeholder = ph;
+  const rotText = "Add multiple keys (one per line or comma-separated) for automatic rotation and fallback if one hits rate limits (429).";
+  $("#ai_keyhint").innerHTML = pv.key_url ? `${pv.needs_key ? "Get keys at" : "Set it up at"} <a href="${esc(pv.key_url)}" target="_blank" rel="noopener">${esc(pv.key_url.replace("https://", ""))}</a>. ${rotText} Keys stay on this server and are never shown again.` : `${rotText} Keys stay on this server and are never shown again.`;
   $("#ai_model").placeholder = pv.example ? "For example " + pv.example : "The model id, exactly as the service names it";
   $("#ai_base").placeholder = pv.address || "http://127.0.0.1:1234/v1";
   $("#ai_basewrap").hidden = pv.id !== "custom" && !(same && k.base_url);
@@ -2073,10 +2222,10 @@ async function drawSettings() {
     if (tab === "ai") {
       const k = S.ai = await api("/api/ai");
       body.innerHTML = `<section class="set-sec"><h2>AI</h2><p class="help">PeakCut uses an AI model to pick the moments worth clipping and to write hooks, titles and captions. Use your own key from any of these services. You pay that service directly. Without a key, clips are picked by loudness.</p>
-          <div class="ai-state">${k.ready ? `<span class="pill ok">${ic("check")}Ready</span><span class="sub">${esc(k.label)} · ${esc(k.models[0] || "")}</span>` : `<span class="pill warn">Not set up</span><span class="sub">Choose a service, paste your key and pick a model.</span>`}</div>
+          <div class="ai-state">${k.ready ? `<span class="pill ok">${ic("check")}Ready</span><span class="sub">${esc(k.label)} · ${esc(k.models[0] || "")}${k.key_count > 1 ? ` · ${k.key_count} keys in rotation` : ""}</span>` : `<span class="pill warn">Not set up</span><span class="sub">Choose a service, paste your key and pick a model.</span>`}</div>
           <div class="ai-form">
             <label class="f">AI service<select id="ai_provider">${k.providers.map(x => `<option value="${esc(x.id)}" ${x.id === k.provider ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select></label>
-            <label class="f">Key<input id="ai_key" type="password" autocomplete="off" spellcheck="false"><span class="hint" id="ai_keyhint"></span></label>
+            <label class="f">Key(s)<textarea id="ai_key" rows="2" autocomplete="off" spellcheck="false" style="font-family:monospace;font-size:13px"></textarea><span class="hint" id="ai_keyhint"></span></label>
             <label class="f" id="ai_basewrap">Address<input id="ai_base" value="${esc(k.base_url || "")}" spellcheck="false"><span class="hint">Where the service answers. Only needed for a custom service.</span></label>
             <label class="f">Model<span class="with"><input id="ai_model" list="ai_models" value="${esc(k.models.join(", "))}" spellcheck="false"><button class="btn" type="button" data-act="aimodels">Find models</button></span>
               <datalist id="ai_models"></datalist><span class="hint">A fast, inexpensive model is the right choice. Add a second one after a comma to fall back on.</span></label>
@@ -2206,13 +2355,15 @@ async function ytCookiesCard(logo) {
 async function saveSettings() { const d = {}; $$("#sform [data-s]").forEach(i => d[i.dataset.s] = i.value); await send("/api/settings", d, "PUT"); }
 
 /* ============================================================ clip editor */
+let CROP_STATE = null;
+
 function openClip(jid, cid) { D.jid = jid; D.cid = cid; D.sig = ""; drawClipDlg(true); $("#clipdlg").showModal(); }
 function drawClipDlg(full) {
   const j = jobOf(D.jid), c = j?.clips.find(x => x.id === D.cid), dlg = $("#clipdlg");
   if (!c) { if (dlg.open) dlg.close(); return; }
   const m = `/media/${j.id}/`, sig = c.status + c.version;
   const stage = c.status === "done" ? `<video src="${m}${esc(c.file)}?v=${c.version}" poster="${m}${esc(c.cover)}?v=${c.version}" controls autoplay playsinline></video>`
-    : c.status === "error" ? `<div class="err" style="padding:20px;text-align:center">${esc(c.error || "Could not make this clip.")}</div>`
+    : c.status === "error" ? (c.file ? `<div style="position:relative;width:100%"><div class="err" style="padding:10px 14px;font-size:12px;margin:8px;border-radius:8px">Last remake failed: ${esc(c.error || "")}. Keeping previous render.</div><video src="${m}${esc(c.file)}?v=${c.version}" poster="${m}${esc(c.cover)}?v=${c.version}" controls autoplay playsinline></video></div>` : `<div class="err" style="padding:20px;text-align:center">${esc(c.error || "Could not make this clip.")}</div>`)
     : `<span class="making">${c.status === "rendering" ? "Making this clip…" : "Waiting its turn…"}</span>`;
   if (full) {
     dlg.innerHTML = `<div class="editor"><div class="stage" id="stage">${stage}</div>
@@ -2223,7 +2374,8 @@ function drawClipDlg(full) {
         <label class="f">Big text<input data-f="hook" value="${esc(c.hook)}"></label>
         <label class="sw"><input type="checkbox" data-f="captions" data-caption-toggle ${c.captions === false ? "" : "checked"}>Generate captions</label>
         <div class="two"><label class="f">Caption style<select data-f="style" data-caption-style ${c.captions === false ? "disabled" : ""}>${opts(S.status.styles, c.style)}</select></label>
-          <label class="f">Layout<select data-f="layout">${opts(S.status.layouts, c.layout)}</select></label></div>
+          <label class="f">Layout<select data-f="layout" id="clipLayoutSelect">${opts(S.status.layouts, c.layout)}</select></label></div>
+        ${c.layout === "stacked" ? `<button type="button" class="btn sm" data-act="opencrop" style="margin-top:-6px;margin-bottom:6px;width:100%">${ic("crop")} Adjust Facecam & Gameplay Crops</button>` : ""}
         <div class="two"><label class="f">Start (seconds)<input data-f="start" type="number" step="0.5" value="${c.start}"></label>
           <label class="f">End (seconds)<input data-f="end" type="number" step="0.5" value="${c.end}"></label></div>
         <div class="row" style="justify-content:space-between;align-items:center"><h3>Post text</h3>
@@ -2241,16 +2393,493 @@ function drawClipDlg(full) {
           ${c.status === "done" ? `<a class="btn" href="${m}${esc(c.file)}?download=1">${ic("down")}Download</a>` : ""}
           <button class="btn" data-act="copy" data-j="${j.id}" data-c="${esc(c.id)}">${ic("copy")}Copy post text</button></div>
       </div></div>`;
+    const laySel = $("#clipLayoutSelect");
+    if (laySel) {
+      laySel.addEventListener("change", e => {
+        if (e.target.value === "stacked") openCropEditor(j, c);
+      });
+    }
   } else if (D.sig !== sig) $("#stage").innerHTML = stage;
   D.sig = sig;
   put($("#dposts"), postPills(c));
+}
+
+function openCropEditor(j, c) {
+  const dlg = $("#clipdlg");
+  dlg.classList.add("crop-dlg");
+  const dur = Math.max(0.1, (c.end || 0) - (c.start || 0));
+  const hookVal = c.hook || c.title || "";
+  const CAM_AR = 1080 / 720;
+  const GAME_AR = 1080 / 1200;
+  const srcAR = (j.width && j.height) ? (j.width / j.height) : (16 / 9);
+
+  let cam = [0.60, 0.05, 0.35, Math.min(0.9, 0.35 * (720 / 1080) * srcAR)];
+  let game = [0.10, 0.05, 0.80, Math.min(0.9, 0.80 * (1200 / 1080) * srcAR)];
+  if (c.stacked_crops && c.stacked_crops.cam && c.stacked_crops.game) {
+    cam = [...c.stacked_crops.cam];
+    game = [...c.stacked_crops.game];
+  } else if (c.facecam && c.facecam.length === 4 && j.width && j.height) {
+    const fx = c.facecam[0] / j.width, fy = c.facecam[1] / j.height;
+    const fw = Math.max(0.15, c.facecam[2] / j.width);
+    const fh = fw * (720 / 1080) * (j.width / j.height);
+    cam = [Math.max(0, Math.min(1 - fw, fx)), Math.max(0, Math.min(1 - fh, fy)), fw, Math.min(1, fh)];
+  }
+
+  CROP_STATE = {
+    jid: j.id,
+    cid: c.id,
+    dur: dur,
+    t: 0.0,
+    cam: cam,
+    game: game,
+    natW: j.width || 1920,
+    natH: j.height || 1080
+  };
+
+  dlg.innerHTML = `
+    <div class="crop-modal">
+      <div class="crop-head">
+        <div>
+          <h3>Stacked Gaming Crop Editor</h3>
+          <p class="sub">Choose which parts appear in the facecam (top) and gameplay (bottom). Aspect ratios stay locked to output panels.</p>
+        </div>
+        <button class="btn icon ghost" data-act="closecrop" aria-label="Close">${ic("x")}</button>
+      </div>
+      <div class="crop-body">
+        <div class="crop-main">
+          <div class="crop-frame-wrap" id="cropFrameWrap">
+            <img id="cropSourceImg" class="crop-source-img" alt="Source video frame" />
+            <div class="crop-overlay" id="cropOverlay">
+              <div class="crop-rect cam" id="rectCam">
+                <span class="crop-label">Facecam (Top)</span>
+                <span class="crop-h nw" data-h="nw"></span>
+                <span class="crop-h ne" data-h="ne"></span>
+                <span class="crop-h se" data-h="se"></span>
+                <span class="crop-h sw" data-h="sw"></span>
+              </div>
+              <div class="crop-rect game" id="rectGame">
+                <span class="crop-label">Gameplay (Bottom)</span>
+                <span class="crop-h nw" data-h="nw"></span>
+                <span class="crop-h ne" data-h="ne"></span>
+                <span class="crop-h se" data-h="se"></span>
+                <span class="crop-h sw" data-h="sw"></span>
+              </div>
+            </div>
+            <div id="cropImgLoading" class="crop-img-loading"><span>Loading frame…</span></div>
+          </div>
+          <div class="crop-scrubber-box">
+            <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:4px">
+              <span style="font-size:12px;font-weight:600">Timeline scrubber</span>
+              <span id="cropTimeTxt" style="font-size:12px;color:var(--dim)">0.0s / ${dur.toFixed(1)}s</span>
+            </div>
+            <input type="range" id="cropRange" min="0" max="${dur}" step="0.25" value="0" style="width:100%" />
+            <p class="help" style="margin-top:4px">Scrub to pick a clearer frame if the clip opens on a transition or the facecam is hidden.</p>
+          </div>
+        </div>
+        <div class="crop-sidebar">
+          <h4 style="margin:0 0 8px 0;font-size:13px;font-weight:600;color:var(--dim)">Vertical Preview (1080 × 1920)</h4>
+          <div class="crop-preview-container">
+            <canvas id="cropPrevCam" width="1080" height="720" class="crop-prev-cam"></canvas>
+            <canvas id="cropPrevGame" width="1080" height="1200" class="crop-prev-game"></canvas>
+            <div id="cropPrevHook" class="crop-prev-hook-overlay">${esc((hookVal || '').toUpperCase())}</div>
+          </div>
+          <label class="f" style="margin-top:14px">
+            Title hook on video
+            <input id="cropHookIn" value="${esc(hookVal)}" placeholder="Title hook on dividing line">
+          </label>
+          <div class="crop-emoji-bar" title="Click to insert emoji">
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="🔥">🔥</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="😭">😭</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="😱">😱</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="💀">💀</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="😂">😂</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="🤯">🤯</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="🎯">🎯</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="👀">👀</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="⚡">⚡</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="👑">👑</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="🎮">🎮</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="🙏">🙏</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="💯">💯</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="🚨">🚨</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="💣">💣</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="🏆">🏆</button>
+            <button type="button" class="crop-emoji-btn" data-act="addcropemoji" data-emoji="✨">✨</button>
+          </div>
+          <p class="help">Displayed on the line where facecam and gameplay join: bold white text with a black border.</p>
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:14px">
+            <button class="btn primary" id="cropSaveBtn" data-act="savecrop">${ic("scissors")} Save & Remake Clip</button>
+            <button class="btn ghost" data-act="closecrop">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  function updateOverlayRects() {
+    const rCam = $("#rectCam"), rGame = $("#rectGame");
+    if (!rCam || !rGame) return;
+    const [cx, cy, cw, ch] = CROP_STATE.cam;
+    rCam.style.left = (cx * 100) + "%";
+    rCam.style.top = (cy * 100) + "%";
+    rCam.style.width = (cw * 100) + "%";
+    rCam.style.height = (ch * 100) + "%";
+
+    const [gx, gy, gw, gh] = CROP_STATE.game;
+    rGame.style.left = (gx * 100) + "%";
+    rGame.style.top = (gy * 100) + "%";
+    rGame.style.width = (gw * 100) + "%";
+    rGame.style.height = (gh * 100) + "%";
+  }
+
+  function updateCropPreview() {
+    const img = $("#cropSourceImg");
+    if (!img || !img.complete || !img.naturalWidth) return;
+    const nw = img.naturalWidth, nh = img.naturalHeight;
+    const cCam = $("#cropPrevCam");
+    if (cCam) {
+      const ctx = cCam.getContext("2d");
+      const [cx, cy, cw, ch] = CROP_STATE.cam;
+      ctx.drawImage(img, cx * nw, cy * nh, cw * nw, ch * nh, 0, 0, 1080, 720);
+    }
+    const cGame = $("#cropPrevGame");
+    if (cGame) {
+      const ctx = cGame.getContext("2d");
+      const [gx, gy, gw, gh] = CROP_STATE.game;
+      ctx.drawImage(img, gx * nw, gy * nh, gw * nw, gh * nh, 0, 0, 1080, 1200);
+    }
+  }
+
+  const img = $("#cropSourceImg");
+  const loading = $("#cropImgLoading");
+  let loadTimeout = null;
+
+  function loadFrame(t) {
+    loading.style.display = "flex";
+    const url = `/api/jobs/${j.id}/clips/${c.id}/frame?t=${encodeURIComponent(t.toFixed(2))}`;
+    const nextImg = new Image();
+    nextImg.onload = () => {
+      img.src = url;
+      CROP_STATE.natW = nextImg.naturalWidth || 1920;
+      CROP_STATE.natH = nextImg.naturalHeight || 1080;
+      loading.style.display = "none";
+      updateOverlayRects();
+      updateCropPreview();
+    };
+    nextImg.onerror = () => {
+      loading.style.display = "none";
+      toast("Could not load frame from video", "bad");
+    };
+    nextImg.src = url;
+  }
+  loadFrame(0.0);
+
+  $("#cropRange").addEventListener("input", e => {
+    const val = Number(e.target.value);
+    CROP_STATE.t = val;
+    $("#cropTimeTxt").textContent = `${val.toFixed(1)}s / ${dur.toFixed(1)}s`;
+    clearTimeout(loadTimeout);
+    loadTimeout = setTimeout(() => loadFrame(val), 120);
+  });
+
+  $("#cropHookIn")?.addEventListener("input", e => {
+    const prev = $("#cropPrevHook");
+    if (prev) prev.textContent = e.target.value.toUpperCase();
+  });
+
+  const overlay = $("#cropOverlay");
+  let activeDrag = null;
+
+  function onPointerDown(e) {
+    const handle = e.target.closest(".crop-h");
+    const rect = e.target.closest(".crop-rect");
+    if (!rect) return;
+    const kind = rect.classList.contains("cam") ? "cam" : "game";
+    const h = handle ? handle.dataset.h : null;
+    rect.setPointerCapture(e.pointerId);
+    activeDrag = {
+      pointerId: e.pointerId,
+      kind: kind,
+      handle: h,
+      startX: e.clientX,
+      startY: e.clientY,
+      initialBox: [...CROP_STATE[kind]]
+    };
+    e.preventDefault();
+  }
+
+  function onPointerMove(e) {
+    if (!activeDrag || e.pointerId !== activeDrag.pointerId) return;
+    const wrap = $("#cropFrameWrap");
+    const r = wrap.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+
+    const kind = activeDrag.kind;
+    const targetAR = kind === "cam" ? CAM_AR : GAME_AR;
+    const srcAR = (CROP_STATE.natW || 1920) / (CROP_STATE.natH || 1080);
+    const normAR = targetAR / srcAR;
+
+    const dx = (e.clientX - activeDrag.startX) / r.width;
+    const dy = (e.clientY - activeDrag.startY) / r.height;
+    const init = activeDrag.initialBox;
+
+    if (!activeDrag.handle) {
+      let nx = Math.max(0, Math.min(1 - init[2], init[0] + dx));
+      let ny = Math.max(0, Math.min(1 - init[3], init[1] + dy));
+      CROP_STATE[kind][0] = nx;
+      CROP_STATE[kind][1] = ny;
+    } else {
+      const h = activeDrag.handle;
+      if (h === "se") {
+        const x0 = init[0], y0 = init[1];
+        let w = Math.max(0.06, init[2] + dx);
+        let hgt = w / normAR;
+        if (x0 + w > 1 || y0 + hgt > 1) {
+          w = Math.min(1 - x0, (1 - y0) * normAR);
+          hgt = w / normAR;
+        }
+        CROP_STATE[kind][2] = Math.max(0.06, w);
+        CROP_STATE[kind][3] = Math.max(0.06 / normAR, hgt);
+      } else if (h === "sw") {
+        const x1 = init[0] + init[2], y0 = init[1];
+        let w = Math.max(0.06, init[2] - dx);
+        let hgt = w / normAR;
+        if (x1 - w < 0 || y0 + hgt > 1) {
+          w = Math.min(x1, (1 - y0) * normAR);
+          hgt = w / normAR;
+        }
+        CROP_STATE[kind][0] = x1 - w;
+        CROP_STATE[kind][2] = Math.max(0.06, w);
+        CROP_STATE[kind][3] = Math.max(0.06 / normAR, hgt);
+      } else if (h === "ne") {
+        const x0 = init[0], y1 = init[1] + init[3];
+        let w = Math.max(0.06, init[2] + dx);
+        let hgt = w / normAR;
+        if (x0 + w > 1 || y1 - hgt < 0) {
+          w = Math.min(1 - x0, y1 * normAR);
+          hgt = w / normAR;
+        }
+        CROP_STATE[kind][1] = y1 - hgt;
+        CROP_STATE[kind][2] = Math.max(0.06, w);
+        CROP_STATE[kind][3] = Math.max(0.06 / normAR, hgt);
+      } else if (h === "nw") {
+        const x1 = init[0] + init[2], y1 = init[1] + init[3];
+        let w = Math.max(0.06, init[2] - dx);
+        let hgt = w / normAR;
+        if (x1 - w < 0 || y1 - hgt < 0) {
+          w = Math.min(x1, y1 * normAR);
+          hgt = w / normAR;
+        }
+        CROP_STATE[kind][0] = x1 - w;
+        CROP_STATE[kind][1] = y1 - hgt;
+        CROP_STATE[kind][2] = Math.max(0.06, w);
+        CROP_STATE[kind][3] = Math.max(0.06 / normAR, hgt);
+      }
+    }
+    updateOverlayRects();
+    updateCropPreview();
+  }
+
+  function onPointerUp(e) {
+    if (activeDrag && e.pointerId === activeDrag.pointerId) {
+      activeDrag = null;
+      updateCropPreview();
+    }
+  }
+
+  overlay.addEventListener("pointerdown", onPointerDown);
+  overlay.addEventListener("pointermove", onPointerMove);
+  overlay.addEventListener("pointerup", onPointerUp);
+  overlay.addEventListener("pointercancel", onPointerUp);
+
+  updateOverlayRects();
+}
+
+async function saveCropRemake() {
+  if (!CROP_STATE) return;
+  const j = jobOf(CROP_STATE.jid), c = j?.clips.find(x => x.id === CROP_STATE.cid);
+  if (!j || !c) return;
+  const btn = $("#cropSaveBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Saving & re-making…";
+  }
+  const hookText = ($("#cropHookIn")?.value || "").trim();
+  const body = {
+    layout: "stacked",
+    hook: hookText,
+    title: hookText || c.title || "",
+    stacked_crops: {
+      cam: CROP_STATE.cam.map(v => Math.round(v * 10000) / 10000),
+      game: CROP_STATE.game.map(v => Math.round(v * 10000) / 10000)
+    }
+  };
+  try {
+    await send(`/api/jobs/${j.id}/clips/${c.id}/render`, body);
+    toast("Re-making clip with your stacked crops…", "ok");
+    $("#clipdlg").classList.remove("crop-dlg");
+    drawClipDlg(true);
+    await tick();
+  } catch (err) {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `${ic("scissors")} Save & Remake Clip`;
+    }
+    toast(err.message || "Failed to remake clip", "bad");
+  }
 }
 function postText() {   // the post text as it is in the clip editor right now
   const v = k => $(`#clipdlg [data-f="${k}"]`).value;
   return {title: v("title"), description: v("description"), hashtags: v("hashtags").split(/\s+/).map(h => h.replace(/^#+/, "")).filter(Boolean)};
 }
-$("#clipdlg").addEventListener("close", () => { $("#clipdlg").innerHTML = ""; D.jid = null; });
+$("#clipdlg").addEventListener("close", () => { $("#clipdlg").innerHTML = ""; D.jid = null; $("#clipdlg").classList.remove("crop-dlg"); CROP_STATE = null; });
 $("#clipdlg").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+
+let moreClipsJid = null;
+let moreClipsMode = "ai";
+
+function openMoreClipsDlg(jid) {
+  const j = jobOf(jid);
+  if (!j) return;
+  moreClipsJid = jid;
+  moreClipsMode = "ai";
+  const dlg = $("#moreclipsdlg");
+  if (!dlg) return;
+
+  dlg.innerHTML = `
+    <form method="dialog" class="dlg" id="moreclipsform" style="width:480px;max-width:95vw;padding:22px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="margin:0;font-size:18px;color:var(--brand-ink);display:flex;align-items:center;gap:8px">
+          <span style="color:#FF8B33;display:inline-flex;align-items:center">${ic("plus")}</span>Generate Another Clip
+        </h2>
+        <button type="button" class="btn sm icon ghost" data-act="closemoreclips" aria-label="Close">${ic("x")}</button>
+      </div>
+      <div style="font-size:13px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(j.title || j.source?.name || "")}">
+        ${esc(j.title || j.source?.name || "Selected Video")}
+      </div>
+
+      <div class="seg" role="group" style="margin-top:2px;display:flex;background:var(--muted);border:1px solid var(--line);border-radius:10px;padding:4px">
+        <button type="button" id="more_mode_ai" data-act="setmoremode" data-more-mode="ai" aria-pressed="true" style="flex:1">
+          AI Highlights
+          <small>Auto-pick new moments</small>
+        </button>
+        <button type="button" id="more_mode_manual" data-act="setmoremode" data-more-mode="manual" aria-pressed="false" style="flex:1">
+          Manual
+          <small>Choose timestamps</small>
+        </button>
+      </div>
+
+      <div id="more_ai_box" style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+        <label class="f">
+          <span class="ot" style="margin:0">Number of clips to generate</span>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+            <input type="number" id="more_ai_count" min="1" max="10" value="1" style="width:80px;padding:8px 12px;font-size:15px;font-weight:600;text-align:center;border:1px solid var(--line);border-radius:var(--r-sm)">
+            <span style="font-size:13px;color:var(--dim)">New clip(s) that won't repeat existing reels</span>
+          </div>
+        </label>
+      </div>
+
+      <div id="more_manual_box" style="display:none;flex-direction:column;gap:10px;margin-top:6px">
+        <div style="font-size:13px;color:var(--dim)">
+          Enter start and end timestamps in hours, minutes, seconds (e.g. <code>00:01:30</code> or <code>1:30</code>). Duration must be <b>60 seconds or less</b>.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <label class="f">
+            <span class="ot" style="margin:0">Start time</span>
+            <input type="text" id="more_m_start" placeholder="00:00:00" autocomplete="off" style="padding:8px 12px;font-size:14px;border:1px solid var(--line);border-radius:var(--r-sm);font-weight:600">
+          </label>
+          <label class="f">
+            <span class="ot" style="margin:0">End time</span>
+            <input type="text" id="more_m_end" placeholder="00:00:45" autocomplete="off" style="padding:8px 12px;font-size:14px;border:1px solid var(--line);border-radius:var(--r-sm);font-weight:600">
+          </label>
+        </div>
+        <div id="more_m_info" style="font-size:12px;color:var(--dim)">Single clip (Max 60s)</div>
+      </div>
+
+      <div class="dlg-foot" style="margin-top:10px;display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" class="btn ghost" data-act="closemoreclips">Cancel</button>
+        <button type="button" class="btn primary" id="more_submit_btn" data-act="submitmoreclips">${ic("scissors")}Generate</button>
+      </div>
+    </form>
+  `;
+
+  dlg.showModal();
+
+  const modeAiBtn = $("#more_mode_ai", dlg);
+  const modeManBtn = $("#more_mode_manual", dlg);
+  const aiBox = $("#more_ai_box", dlg);
+  const manBox = $("#more_manual_box", dlg);
+
+  function switchMode(m) {
+    moreClipsMode = m;
+    modeAiBtn?.setAttribute("aria-pressed", String(m === "ai"));
+    modeManBtn?.setAttribute("aria-pressed", String(m === "manual"));
+    if (aiBox) aiBox.style.display = m === "ai" ? "flex" : "none";
+    if (manBox) manBox.style.display = m === "manual" ? "flex" : "none";
+    if (m === "manual") $("#more_m_start", dlg)?.focus();
+  }
+
+  modeAiBtn?.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); switchMode("ai"); });
+  modeManBtn?.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); switchMode("manual"); });
+
+  const sIn = $("#more_m_start", dlg);
+  const eIn = $("#more_m_end", dlg);
+  const infoEl = $("#more_m_info", dlg);
+  const updateInfo = () => updateManualDuration(sIn, eIn, infoEl);
+  sIn?.addEventListener("input", updateInfo);
+  eIn?.addEventListener("input", updateInfo);
+}
+
+async function submitMoreClips() {
+  if (!moreClipsJid) return;
+  const btn = $("#more_submit_btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Adding..."; }
+  
+  let payload = {};
+  if (moreClipsMode === "manual") {
+    const sStr = $("#more_m_start")?.value.trim();
+    const eStr = $("#more_m_end")?.value.trim();
+    if (!sStr || !eStr) {
+      toast("Please enter both start and end timestamps.", "bad");
+      if (btn) { btn.disabled = false; btn.innerHTML = `${ic("scissors")}Generate`; }
+      return;
+    }
+    const sSec = parseTimestamp(sStr);
+    const eSec = parseTimestamp(eStr);
+    if (sSec === null || eSec === null) {
+      toast("Invalid timestamp format. Use HH:MM:SS or MM:SS (e.g. 00:01:30).", "bad");
+      if (btn) { btn.disabled = false; btn.innerHTML = `${ic("scissors")}Generate`; }
+      return;
+    }
+    if (eSec <= sSec) {
+      toast("End time must be after start time.", "bad");
+      if (btn) { btn.disabled = false; btn.innerHTML = `${ic("scissors")}Generate`; }
+      return;
+    }
+    if (eSec - sSec > 60.0 + 1e-3) {
+      toast("Clip duration cannot exceed 60 seconds (must be 60s or less).", "bad");
+      if (btn) { btn.disabled = false; btn.innerHTML = `${ic("scissors")}Generate`; }
+      return;
+    }
+    payload = {mode: "manual", start: sSec, end: eSec};
+  } else {
+    const count = parseInt($("#more_ai_count")?.value, 10) || 1;
+    payload = {mode: "ai", count: count};
+  }
+
+  try {
+    const res = await send(`/api/jobs/${moreClipsJid}/add_clips`, payload);
+    $("#moreclipsdlg")?.close();
+    toast(`Generating ${payload.mode === "manual" ? "manual clip" : (payload.count || 1) + " new clip(s)"}...`, "ok");
+    await tick();
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.innerHTML = `${ic("scissors")}Generate`; }
+    toast(err.message || "Failed to add clip.", "bad");
+  }
+}
+
+$("#moreclipsdlg").addEventListener("close", () => { $("#moreclipsdlg").innerHTML = ""; moreClipsJid = null; });
+$("#moreclipsdlg").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
 /* ============================================================ render + polling */
 function render() {
@@ -2366,8 +2995,10 @@ document.addEventListener("click", async e => {
         let ok = null, why = "";
         try { ok = await send("/api/ai/test"); } catch (err) { why = err.message; }
         S.status = await api("/api/status"); drawShell(); await drawSettings();
-        if (ok) toast(`Saved. ${ok.model} answered, so the AI is ready.`, "ok");
-        else toast(`Saved, but the test failed. ${why}`, "bad");
+        if (ok) {
+          const kc = S.ai?.key_count || 1;
+          toast(`Saved. ${ok.model} answered, so the AI is ready${kc > 1 ? ` with ${kc} keys in rotation` : ""}.`, "ok");
+        } else toast(`Saved, but the test failed. ${why}`, "bad");
       } finally { b.disabled = false; }
       return;
     }
@@ -2389,6 +3020,46 @@ document.addEventListener("click", async e => {
     if (a === "menu") return $("#app").classList.toggle("open");
     if (a === "collapse") { const m = $("#app").classList.toggle("mini"); try { localStorage.setItem("mini", m ? "1" : ""); } catch {} return; }
     if (a === "toggleopts") { const p = $(".composer-opts"), open = !p.classList.contains("open"); p.classList.toggle("open", open); p.inert = !open; b.classList.toggle("on", open); b.setAttribute("aria-expanded", String(open)); return; }
+    if (a === "togglemanual") {
+      const m = $("#composerManual");
+      if (!m) return;
+      const open = m.style.display === "none" || !m.style.display;
+      m.style.display = open ? "block" : "none";
+      b.classList.toggle("on", open);
+      b.setAttribute("aria-expanded", String(open));
+      const goBtn = $("#goBtn");
+      if (goBtn) goBtn.innerHTML = open ? `${ic("scissors")}Make manual clip` : `${ic("scissors")}Make clips`;
+      if (open) $("#m_start")?.focus();
+      return;
+    }
+    if (a === "addmoreclips") {
+      const jid = d.j;
+      if (jid) openMoreClipsDlg(jid);
+      return;
+    }
+    if (a === "closemoreclips") {
+      $("#moreclipsdlg")?.close();
+      return;
+    }
+    if (a === "submitmoreclips") {
+      submitMoreClips();
+      return;
+    }
+    if (a === "setmoremode" || e.target.closest("[data-more-mode]")) {
+      const btn = e.target.closest("[data-more-mode]");
+      const mode = btn?.dataset.moreMode || d.moreMode;
+      if (mode) {
+        moreClipsMode = mode;
+        $("#more_mode_ai")?.setAttribute("aria-pressed", String(mode === "ai"));
+        $("#more_mode_manual")?.setAttribute("aria-pressed", String(mode === "manual"));
+        const aiBox = $("#more_ai_box");
+        const manBox = $("#more_manual_box");
+        if (aiBox) aiBox.style.display = mode === "ai" ? "flex" : "none";
+        if (manBox) manBox.style.display = mode === "manual" ? "flex" : "none";
+        if (mode === "manual") $("#more_m_start")?.focus();
+      }
+      return;
+    }
     if (a === "focusurl") return $("#url")?.focus();
     if (a === "step") {
       const t = d.to;
@@ -2401,6 +3072,35 @@ document.addEventListener("click", async e => {
     if (a === "pickfile") return $("#file").click();
     if (a === "addmore") { const u = $("#url"); return u && !u.value ? (u.focus(), toast("Paste another link, or drop a file anywhere on the box.")) : $("#file").click(); }
     if (a === "closedlg") return $("#clipdlg").close();
+    if (a === "opencrop") {
+      const j = jobOf(D.jid), c = j?.clips.find(x => x.id === D.cid);
+      if (j && c) openCropEditor(j, c);
+      return;
+    }
+    if (a === "closecrop") {
+      $("#clipdlg").classList.remove("crop-dlg");
+      drawClipDlg(true);
+      return;
+    }
+    if (a === "addcropemoji") {
+      const em = d.emoji || b.dataset.emoji;
+      const inp = $("#cropHookIn");
+      if (!inp || !em) return;
+      const start = inp.selectionStart ?? inp.value.length;
+      const end = inp.selectionEnd ?? inp.value.length;
+      const val = inp.value;
+      const preSpace = (start > 0 && val[start - 1] !== " ") ? " " : "";
+      const postSpace = (end < val.length && val[end] !== " ") ? " " : "";
+      inp.value = val.slice(0, start) + preSpace + em + postSpace + val.slice(end);
+      const newPos = start + preSpace.length + em.length + postSpace.length;
+      inp.focus();
+      inp.setSelectionRange(newPos, newPos);
+      inp.dispatchEvent(new Event("input", { bubbles: true }));
+      return;
+    }
+    if (a === "savecrop") {
+      return void await saveCropRemake();
+    }
     if (a === "openclip") return openClip(d.j, d.c);
     if (a === "newcreator") {
       const dlg = $("#formdlg");
@@ -2571,6 +3271,10 @@ document.addEventListener("click", async e => {
       const body = {}; $$("#clipdlg [data-f]").forEach(i => {
         body[i.dataset.f] = i.type === "checkbox" ? i.checked : i.type === "number" ? Number(i.value) : i.value;
       });
+      const j = jobOf(D.jid), c = j?.clips.find(x => x.id === D.cid);
+      if (c && c.stacked_crops && body.layout === "stacked") {
+        body.stacked_crops = c.stacked_crops;
+      }
       await send(`/api/jobs/${D.jid}/clips/${D.cid}/render`, body); toast("Re-making the clip…", "ok"); return tick();
     }
     if (a === "writetext") {
