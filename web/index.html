@@ -3680,33 +3680,13 @@ function formatTimestamp(sec) {
   return `${p(m)}:${p(s)}`;
 }
 
-function jobOptions() {
-  const o = {};
-  const c = targetCreator();
-  if (c) return o;
-  $$(".composer-opts [data-k]").forEach(inp => {
-    const k = inp.dataset.k;
-    if (inp.type === "checkbox") o[k] = inp.checked;
-    else if (inp.type === "number") o[k] = Number(inp.value);
-    else o[k] = inp.value;
-  });
-  const tpl = $("#o_tpl")?.value; if (tpl) o.template = tpl;
-  const camp = $("#o_camp")?.value; if (camp) o.campaign = camp;
-  if ($("#manualChip") && $("#manualChip").classList.contains("on")) {
-    const sStr = $("#m_start")?.value.trim();
-    const eStr = $("#m_end")?.value.trim();
-    if (!sStr || !eStr) throw new Error("Please enter both Start and End timestamps for manual clipping.");
-    const s = parseTimestamp(sStr);
-    const e = parseTimestamp(eStr);
-    if (s === null || e === null) throw new Error("Invalid timestamps. Use HH:MM:SS or MM:SS.");
-    if (e <= s) throw new Error("End timestamp must be greater than Start timestamp.");
-    const dur = e - s;
-    if (dur > 60) throw new Error("Manual clip duration must be 60 seconds or less (" + dur.toFixed(1) + "s entered).");
-    o.manual_clip = { start: s, end: e };
-    o.max_clips = 1;
-  }
-  return o;
+// the add box says so when the style in use zooms in (its clips are fetched sharper, and take a little longer)
+function hqNote() {
+  const n = $("#hqnote"), c = creator(); if (!n) return;
+  const t = tplOf($("#o_tpl")?.value || (c && tplOf(c.template) ? c.template : S.tpl.default));
+  n.hidden = !t?.hq;
 }
+const langItems = () => [{v: "", label: "Auto (as spoken)", icon: "chat"}, ...Object.entries(S.status.cap_langs || {}).map(([k, l]) => ({v: k, label: l, icon: "chat"}))];
 function jobOptions() {
   const n = id => { const v = $(id)?.value ?? ""; return v === "" ? null : Number(v); };     // a streamer's page has no options here
   const o = {max_clips:n("#o_max"), min_len:n("#o_min"), max_len:n("#o_maxlen")};      // the quality follows the style
